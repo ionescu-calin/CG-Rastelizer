@@ -91,21 +91,30 @@ void Update()
     if( keystate[SDLK_k] ) {
 		cameraPos += MoveSpeed*down;  //Up
 	}
+
+	//Rotate on Y axis
+    if( keystate[SDLK_LEFT] )
+    {
+		yaw += RotationSpeed;
+		cameraR = mat3(cos(yaw), 0, sin(yaw), 0, 1, 0, -sin(yaw), 0, cos(yaw));
+    }
+
+	if( keystate[SDLK_RIGHT] ) {
+		yaw -= RotationSpeed;
+		cameraR = mat3(cos(yaw), 0, sin(yaw), 0, 1, 0, -sin(yaw), 0, cos(yaw));
+	}
 }
 
-void VertexShader( const vec3& v, ivec2& p ) {	
-	float X = v[0] - cameraPos.x;
-	float Y = v[1] - cameraPos.y;
-	float Z = v[2] - cameraPos.z;
-	vec3 p_p = vec3(X,Y,Z);
+void VertexShader( const vec3& v, ivec2& p ) {
+	vec3 p_p = vec3(v[0], v[1], v[2]);	
 
-	p_p = p_p * cameraR;
+	p_p = (p_p - cameraPos) * cameraR;
 
 	if (p_p.z == 0)
 		return;
 
 	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
-	p.y = (int)m((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
+	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
 
 }
 
