@@ -138,7 +138,7 @@ void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color ){
 	int pixels = max(delta.x, delta.y) + 1;
 	vector<ivec2> result(pixels);
 	Interpolate(a, b, result);
-	for(int j = 0; j < result.size(); ++j){
+	for( uint j = 0; j < result.size(); ++j){
 		PutPixelSDL( screen, result[j].x, result[j].y, color );
 	}
 }
@@ -158,7 +158,7 @@ void Draw() {
 	SDL_FillRect( screen, 0, 0 );
 	if( SDL_MUSTLOCK(screen) )
 		SDL_LockSurface(screen);
-	for( int i=0; i<triangles.size(); ++i )
+	for( uint i=0; i<triangles.size(); ++i )
 	{
 		vector<vec3> vertices(3);
 		vector<ivec2> vertices2D(3);
