@@ -27,7 +27,7 @@ int t;
 mat3 cameraR;
 //vec3 camera(0.0f,0.0f, -4.0f);
 vec3 cameraPos( 0, 0, -3.001 );
-float f = 500.0f;
+float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
@@ -104,8 +104,9 @@ void VertexShader( const vec3& v, ivec2& p ) {
 	if (p_p.z == 0)
 		return;
 
-	p.x = int(f*p_p.x/p_p.z) + SCREEN_WIDTH/2.0f;
-	p.y = int(f*p_p.y/p_p.z) + SCREEN_HEIGHT/2.0f;	
+	p.x = (float(f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
+	p.y = (float(f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
+
 }
 
 void Draw() {
