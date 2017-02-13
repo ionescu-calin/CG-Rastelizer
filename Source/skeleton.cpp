@@ -5,6 +5,7 @@
 #include "TestModel.h"
 
 using namespace std;
+using glm::vec2;
 using glm::vec3;
 using glm::mat3;
 using glm::ivec2;
@@ -34,6 +35,8 @@ vector<Triangle> triangles;
 void Update();
 void Draw();
 void VertexShader( const vec3& v, ivec2& p );
+void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
+void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
 
 
 int main( int argc, char* argv[] )
@@ -118,6 +121,21 @@ void VertexShader( const vec3& v, ivec2& p ) {
 
 }
 
+void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ){
+	int N = result.size();
+	vec2 step = vec2(b-a) / float(max(N-1,1));
+	vec2 current( a );
+	for( int i=0; i<N; ++i )
+	{
+		result[i] = current;
+		current += step;
+	}
+}
+
+void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color ){
+
+}
+
 void Draw() {
 	SDL_FillRect( screen, 0, 0 );
 	if( SDL_MUSTLOCK(screen) )
@@ -125,15 +143,45 @@ void Draw() {
 	for( int i=0; i<triangles.size(); ++i )
 	{
 		vector<vec3> vertices(3);
+		vector<ivec2> vertices2D(3);
+
 		vertices[0] = triangles[i].v0;
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
+
+		vec3 color(1,1,1);
 		for(int v=0; v<3; ++v)
 		{
 		    ivec2 projPos;
 		    VertexShader( vertices[v], projPos );
-		    vec3 color(1,1,1);
+		    vertices2D[v] = projPos;
 		    PutPixelSDL( screen, projPos.x, projPos.y, color );
+		}
+		ivec2 delta = abs(vertices2D[0] - vertices2D[1]);
+		int pixels = max(delta.x, delta.y) + 1;
+		vector<ivec2> result1(pixels);
+		Interpolate(vertices2D[0], vertices2D[1], result1);
+		//DrawLineSDL(screen, )
+		for(int j = 0; j < result1.size(); ++j){
+			PutPixelSDL( screen, result1[j].x, result1[j].y, color );
+		}
+
+		 delta = abs(vertices2D[0] - vertices2D[2]);
+		 pixels = max(delta.x, delta.y) + 1;
+		vector<ivec2> result2(pixels);
+		Interpolate(vertices2D[0], vertices2D[2], result2);
+		//DrawLineSDL(screen, )
+		for(int j = 0; j < result2.size(); ++j){
+			PutPixelSDL( screen, result2[j].x, result2[j].y, color );
+		}
+
+		 delta = abs(vertices2D[1] - vertices2D[2]);
+		 pixels = max(delta.x, delta.y) + 1;
+		vector<ivec2> result3(pixels);
+		Interpolate(vertices2D[1], vertices2D[2], result3);
+		//DrawLineSDL(screen, )
+		for(int j = 0; j < result3.size(); ++j){
+			PutPixelSDL( screen, result3[j].x, result3[j].y, color );
 		}
 	}
     if ( SDL_MUSTLOCK(screen) )
