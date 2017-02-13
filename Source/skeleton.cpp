@@ -37,6 +37,7 @@ void Draw();
 void VertexShader( const vec3& v, ivec2& p );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
+void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels );
 
 
 int main( int argc, char* argv[] )
@@ -142,6 +143,17 @@ void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color ){
 	}
 }
 
+void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels ){
+	for( int i=0; i<SCREEN_WIDTH; ++i )
+	{
+		leftPixels[i].x = +numeric_limits<int>::max();
+		rightPixels[i].x = -numeric_limits<int>::max();
+	}
+
+	//Get triangle minimum and maximum points on the row
+}
+
+
 void Draw() {
 	SDL_FillRect( screen, 0, 0 );
 	if( SDL_MUSTLOCK(screen) )
@@ -167,6 +179,9 @@ void Draw() {
 		DrawLineSDL( screen, vertices2D[0], vertices2D[1], color );
 		DrawLineSDL( screen, vertices2D[0], vertices2D[2], color );
 		DrawLineSDL( screen, vertices2D[1], vertices2D[2], color );
+
+		vector<ivec2> leftPixels( SCREEN_WIDTH );
+		vector<ivec2> rightPixels( SCREEN_WIDTH );
 	}
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
