@@ -133,7 +133,13 @@ void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ){
 }
 
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color ){
-
+	ivec2 delta = abs(a - b);
+	int pixels = max(delta.x, delta.y) + 1;
+	vector<ivec2> result(pixels);
+	Interpolate(a, b, result);
+	for(int j = 0; j < result.size(); ++j){
+		PutPixelSDL( screen, result[j].x, result[j].y, color );
+	}
 }
 
 void Draw() {
@@ -157,32 +163,10 @@ void Draw() {
 		    vertices2D[v] = projPos;
 		    PutPixelSDL( screen, projPos.x, projPos.y, color );
 		}
-		ivec2 delta = abs(vertices2D[0] - vertices2D[1]);
-		int pixels = max(delta.x, delta.y) + 1;
-		vector<ivec2> result1(pixels);
-		Interpolate(vertices2D[0], vertices2D[1], result1);
-		//DrawLineSDL(screen, )
-		for(int j = 0; j < result1.size(); ++j){
-			PutPixelSDL( screen, result1[j].x, result1[j].y, color );
-		}
 
-		 delta = abs(vertices2D[0] - vertices2D[2]);
-		 pixels = max(delta.x, delta.y) + 1;
-		vector<ivec2> result2(pixels);
-		Interpolate(vertices2D[0], vertices2D[2], result2);
-		//DrawLineSDL(screen, )
-		for(int j = 0; j < result2.size(); ++j){
-			PutPixelSDL( screen, result2[j].x, result2[j].y, color );
-		}
-
-		 delta = abs(vertices2D[1] - vertices2D[2]);
-		 pixels = max(delta.x, delta.y) + 1;
-		vector<ivec2> result3(pixels);
-		Interpolate(vertices2D[1], vertices2D[2], result3);
-		//DrawLineSDL(screen, )
-		for(int j = 0; j < result3.size(); ++j){
-			PutPixelSDL( screen, result3[j].x, result3[j].y, color );
-		}
+		DrawLineSDL( screen, vertices2D[0], vertices2D[1], color );
+		DrawLineSDL( screen, vertices2D[0], vertices2D[2], color );
+		DrawLineSDL( screen, vertices2D[1], vertices2D[2], color );
 	}
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
