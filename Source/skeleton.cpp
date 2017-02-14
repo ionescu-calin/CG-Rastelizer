@@ -161,6 +161,8 @@ void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftP
 	{
 		leftPixels[i].x = +numeric_limits<int>::max();
 		rightPixels[i].x = -numeric_limits<int>::max();
+		// fill in the y values
+		leftPixels[i].y = rightPixels[i].y = i + minY;
 	}
 	// 4. Loop through all edges of the polygon and use
 	//    linear interpolation to find the x-coordinate for
@@ -174,14 +176,16 @@ void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftP
 		Interpolate(vertexPixels[e], vertexPixels[ne], result);
 		for (int i=0; i<result.size(); ++i) 
 		{
-			printf("%d %d \n", result[i].x, result[i].y);
-			if(result[i].x < leftPixels[i].x)
+			//Obtain the relative index (1 to rows) of the interpolated point of the edge
+			//Otherwise it will have the y coordinate relative to the image space
+			int index = result[i].y - minY; 
+			if(result[i].x < leftPixels[index].x)
 			{
-				leftPixels[i].x = result[i].x;
+				leftPixels[index].x = result[i].x;
 			}
-			if(result[i].x > rightPixels[i].x)
+			if(result[i].x > rightPixels[index].x)
 			{
-				rightPixels[i].x = result[i].x;
+				rightPixels[index].x = result[i].x;
 			}  
 		}
 	}
