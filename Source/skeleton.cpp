@@ -19,18 +19,23 @@ using glm::ivec2;
 const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
 SDL_Surface* screen;
+float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 int t;
-
-/* ----------------------------------------------------------------------------*/
-/* FUNCTIONS                                                                   */
-
-
 mat3 cameraR;
-//vec3 camera(0.0f,0.0f, -4.0f);
 vec3 cameraPos( 0, 0, -3.001 );
 float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
+
+/* ----------------------------------------------------------------------------*/
+/* FUNCTIONS                                                                   */
+
+struct Pixel
+{
+    int x;
+    int y;
+    float zinv;
+};
 
 void Update();
 void Draw();
@@ -263,8 +268,8 @@ void Draw() {
 		//!WIREFRAME (OLD)
 
 		DrawPolygon(vertices, triangles[i].color);
-
 	}
+
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
     SDL_UpdateRect( screen, 0, 0, 0, 0 );
