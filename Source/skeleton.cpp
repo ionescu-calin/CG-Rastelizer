@@ -39,6 +39,7 @@ void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
 void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels );
 void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color );
+void DrawPolygon( const vector<vec3>& vertices, vec3 color );
 
 int main( int argc, char* argv[] )
 {
@@ -193,13 +194,13 @@ void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftP
 
 void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color ) {
 	for(uint i=0; i<leftPixels.size(); i++) {
-		if( (leftPixels[i].y < SCREEN_HEIGHT || rightPixels[i].y < SCREEN_HEIGHT) && (leftPixels[i].y > 0 || rightPixels[i].y > 0)) {
+		if( (leftPixels[i].y < SCREEN_HEIGHT && leftPixels[i].y > 0) || (rightPixels[i].y < SCREEN_HEIGHT && rightPixels[i].y > 0)) {
 			DrawLineSDL(screen, leftPixels[i],rightPixels[i],color);
 		}
 	}
 }
 
-void DrawPolygon( const vector<vec3>& vertices )
+void DrawPolygon( const vector<vec3>& vertices, vec3 color )
 {
     int V = vertices.size();
     vector<ivec2> vertexPixels( V );
@@ -208,7 +209,7 @@ void DrawPolygon( const vector<vec3>& vertices )
     vector<ivec2> leftPixels;
     vector<ivec2> rightPixels;
     ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	DrawRows( leftPixels, rightPixels, vec3(0.5f, 0.5f, 0.5f) );
+	DrawRows( leftPixels, rightPixels, color);
 }
 
 
@@ -257,7 +258,7 @@ void Draw() {
 		// DrawLineSDL( screen, vertices2D[0], vertices2D[1], color );
 		// DrawLineSDL( screen, vertices2D[0], vertices2D[2], color );
 		// DrawLineSDL( screen, vertices2D[1], vertices2D[2], color );
-		DrawPolygon(vertices);
+		DrawPolygon(vertices, triangles[i].color);
 
 		vector<ivec2> leftPixels( SCREEN_WIDTH );
 		vector<ivec2> rightPixels( SCREEN_WIDTH );
