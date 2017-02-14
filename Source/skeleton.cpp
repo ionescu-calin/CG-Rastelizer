@@ -237,6 +237,7 @@ void Draw() {
 	// }
 	//!DEBUGGING
 
+	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
 		vector<vec3> vertices(3);
@@ -246,22 +247,23 @@ void Draw() {
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
 
-		vec3 color(1,1,1);
-		for(int v=0; v<3; ++v)
-		{
-		    ivec2 projPos;
-		    VertexShader( vertices[v], projPos );
-		    vertices2D[v] = projPos;
-		    PutPixelSDL( screen, projPos.x, projPos.y, color );
-		}
+		//WIREFRAME (OLD)
+		// vec3 color(1,1,1);
+		// for(int v=0; v<3; ++v)
+		// {
+		//     ivec2 projPos;
+		//     VertexShader( vertices[v], projPos );
+		//     vertices2D[v] = projPos;
+		//     PutPixelSDL( screen, projPos.x, projPos.y, color );
+		// }
 
 		// DrawLineSDL( screen, vertices2D[0], vertices2D[1], color );
 		// DrawLineSDL( screen, vertices2D[0], vertices2D[2], color );
 		// DrawLineSDL( screen, vertices2D[1], vertices2D[2], color );
+		//!WIREFRAME (OLD)
+
 		DrawPolygon(vertices, triangles[i].color);
 
-		vector<ivec2> leftPixels( SCREEN_WIDTH );
-		vector<ivec2> rightPixels( SCREEN_WIDTH );
 	}
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
