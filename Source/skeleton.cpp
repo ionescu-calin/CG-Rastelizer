@@ -123,7 +123,7 @@ void VertexShader( const vec3& v, Pixel& p ) {
 	if (p_p.z == 0)
 		return;
 
-	p.zinv = 1/p_p.z;
+	p.zinv = 1.0f/p_p.z;
 	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
 	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
 
@@ -145,7 +145,7 @@ void Interpolate( Pixel a, Pixel b, vector<ivec2>& result ){
 
 void InterpolateDepth( Pixel a, Pixel b, vector<float>& resultDepth ){
 	int N = resultDepth.size();
-	float step = abs(a.zinv - b.zinv) / float(max(N-1,1));
+	float step = (b.zinv - a.zinv) / float(max(N-1,1));
 	float current = a.zinv;
 	for( int i=0; i<N; ++i ){
 		resultDepth[i] = current;
@@ -251,7 +251,7 @@ void Draw() {
 
 	for( uint i=0; i<SCREEN_HEIGHT; ++i ){
 		for( uint j=0; j<SCREEN_WIDTH; ++j ){
-			depthBuffer[i][j] = 0;
+			depthBuffer[i][j] = 0.0f;
 		}
 	}
 
