@@ -213,7 +213,7 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 	{
 	 	color = color * result[j].illumination;
 	 	PixelShader(result[j], color);
-	 	color = initialColor;
+	 	//color = initialColor;
 	}
 }
 
