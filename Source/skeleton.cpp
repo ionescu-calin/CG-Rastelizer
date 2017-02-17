@@ -39,12 +39,13 @@ struct Pixel
 
 void Update();
 void Draw();
-void VertexShader( const vec3& v, ivec2& p );
+void VertexShader( const vec3& v, Pixel& p );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
 void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels );
 void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color );
 void DrawPolygon( const vector<vec3>& vertices, vec3 color );
+void PixelShader( const Pixel& p );
 
 int main( int argc, char* argv[] )
 {
@@ -115,7 +116,8 @@ void Update()
 	}
 }
 
-void VertexShader( const vec3& v, ivec2& p ) {
+void VertexShader( const vec3& v, Pixel& p ) 
+{
 	vec3 p_p = vec3(v[0], v[1], v[2]);	
 
 	p_p = (p_p - cameraPos) * cameraR;
@@ -123,15 +125,30 @@ void VertexShader( const vec3& v, ivec2& p ) {
 	if (p_p.z == 0)
 		return;
 
+	p.zinv = 1.0f/p_p.z;
 	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
 	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
 
 }
 
-void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ){
+void PixelShader( const Pixel& p )
+{
+	int x = p.x;
+	int y = p.y;
+	if( p.zinv > depthBuffer[y][x] )
+	{
+		depthBuffer[y][x] = f.zinv;
+		PutPixelSDL( screen, x, y, currentColor );
+	}
+}
+
+void Interpolate( Pixel a, Pixel b, vector<ivec2>& result ){
+	vec2 _a = vec2(a.x, a.y);
+	vec2 _b = vec2(b.x, b.y);
+
 	int N = result.size();
-	vec2 step = vec2(b-a) / float(max(N-1,1));
-	vec2 current( a );
+	vec2 step = vec2(_b - _a) / float(max(N-1,1));
+	vec2 current( _a );
 	for( int i=0; i<N; ++i )
 	{
 		result[i] = current;
@@ -139,17 +156,40 @@ void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ){
 	}
 }
 
-void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color ){
-	ivec2 delta = abs(a - b);
-	int pixels = max(delta.x, delta.y) + 1;
-	vector<ivec2> result(pixels);
-	Interpolate(a, b, result);
-	for( uint j = 0; j < result.size(); ++j){
-		PutPixelSDL( screen, result[j].x, result[j].y, color );
+void InterpolateDepth( Pixel a, Pixel b, vector<float>& resultDepth )
+{
+	int N = resultDepth.size();
+	float step = (b.zinv - a.zinv) / float(max(N-1,1));
+	float current = a.zinv;
+	for( int i=0; i<N; ++i )
+	{
+		resultDepth[i] = current;
+		current += step;
 	}
 }
 
-void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels ){
+void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
+{
+	vec2 _a = vec2(a.x, a.y);
+	vec2 _b = vec2(b.x, b.y);
+
+	ivec2 delta = abs(_a - _b);
+	int pixels = max(delta.x, delta.y) + 1;
+	vector<ivec2> result(pixels);
+	vector<float> resultDepth(pixels);
+	Interpolate(a, b, result);
+	InterpolateDepth(a, b, resultDepth);
+	for( uint j = 0; j < result.size(); ++j )
+	{
+		if(depthBuffer[result[j].x][result[j].y] < resultDepth[j]){
+			depthBuffer[result[j].x][result[j].y] = resultDepth[j];
+			PutPixelSDL( screen, result[j].x, result[j].y, color );
+		}
+	}
+}
+
+void ComputePolygonRows( const vector<Pixel>& vertexPixels, vector<Pixel>& leftPixels, vector<Pixel>& rightPixels )
+{
 	// 1. Find max and min y-value of the polygon
 	//    and compute the number of rows it occupies.
 	int maxY = max( vertexPixels[0].y, max(vertexPixels[1].y, vertexPixels[2].y)); 
@@ -179,7 +219,9 @@ void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftP
 		int ne = (e+1)%3; //next edge
 		int edgePixels = abs(vertexPixels[e].y - vertexPixels[ne].y) + 1;
 		vector<ivec2> result(edgePixels);
+		vector<float> resultDepth(edgePixels);
 		Interpolate(vertexPixels[e], vertexPixels[ne], result);
+		InterpolateDepth(vertexPixels[e], vertexPixels[ne], resultDepth);
 		for (uint i=0; i<result.size(); ++i) 
 		{
 			//Obtain the relative index (1 to rows) of the interpolated point of the edge
@@ -188,19 +230,24 @@ void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftP
 			if(result[i].x < leftPixels[index].x)
 			{
 				leftPixels[index].x = result[i].x;
+				leftPixels[index].zinv = resultDepth[i];
 			}
 			if(result[i].x > rightPixels[index].x)
 			{
 				rightPixels[index].x = result[i].x;
+				rightPixels[index].zinv = resultDepth[i];
 			}  
 		}
 	}
 }
 
-void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color ) {
-	for(uint i=0; i<leftPixels.size(); i++) {
-		if( (leftPixels[i].y < SCREEN_HEIGHT && leftPixels[i].y > 0) || (rightPixels[i].y < SCREEN_HEIGHT && rightPixels[i].y > 0)) {
-			DrawLineSDL(screen, leftPixels[i],rightPixels[i],color);
+void DrawRows( const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels, vec3 color ) 
+{
+	for(uint i=0; i<leftPixels.size(); i++) 
+	{
+		if( (leftPixels[i].y < SCREEN_HEIGHT && leftPixels[i].y > 0) || (rightPixels[i].y < SCREEN_HEIGHT && rightPixels[i].y > 0)) 
+		{
+			DrawLineSDL(screen,leftPixels[i],rightPixels[i],color);
 		}
 	}
 }
@@ -208,39 +255,29 @@ void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels
 void DrawPolygon( const vector<vec3>& vertices, vec3 color )
 {
     int V = vertices.size();
-    vector<ivec2> vertexPixels( V );
+    vector<Pixel> vertexPixels( V );
     for( int i=0; i<V; ++i )
 		VertexShader( vertices[i], vertexPixels[i] );
-    vector<ivec2> leftPixels;
-    vector<ivec2> rightPixels;
+    vector<Pixel> leftPixels;
+    vector<Pixel> rightPixels;
     ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
 	DrawRows( leftPixels, rightPixels, color);
 }
 
 
-void Draw() {
+void Draw() 
+{
 	SDL_FillRect( screen, 0, 0 );
 	if( SDL_MUSTLOCK(screen) )
 		SDL_LockSurface(screen);
 
-	//DEBUGGING
-	// vector<ivec2> vertexPixels(3);
-	// vertexPixels[0] = ivec2(10, 5);
-	// vertexPixels[1] = ivec2( 5,10);
-	// vertexPixels[2] = ivec2(15,15);
-	// vector<ivec2> leftPixels;
-	// vector<ivec2> rightPixels;
-	// ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	// for( uint row=0; row<leftPixels.size(); ++row )
-	// {
-	//     cout << "Start: ("
-	//  << leftPixels[row].x << ","
-	//  << leftPixels[row].y << "). "
-	//  << "End: ("
-	//  << rightPixels[row].x << ","
-	//  << rightPixels[row].y << "). " << endl;
-	// }
-	//!DEBUGGING
+	for( uint i=0; i<SCREEN_HEIGHT; ++i )
+	{
+		for( uint j=0; j<SCREEN_WIDTH; ++j )
+		{
+			depthBuffer[i][j] = 0.0f;
+		}
+	}
 
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
@@ -251,21 +288,6 @@ void Draw() {
 		vertices[0] = triangles[i].v0;
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
-
-		//WIREFRAME (OLD)
-		// vec3 color(1,1,1);
-		// for(int v=0; v<3; ++v)
-		// {
-		//     ivec2 projPos;
-		//     VertexShader( vertices[v], projPos );
-		//     vertices2D[v] = projPos;
-		//     PutPixelSDL( screen, projPos.x, projPos.y, color );
-		// }
-
-		// DrawLineSDL( screen, vertices2D[0], vertices2D[1], color );
-		// DrawLineSDL( screen, vertices2D[0], vertices2D[2], color );
-		// DrawLineSDL( screen, vertices2D[1], vertices2D[2], color );
-		//!WIREFRAME (OLD)
 
 		DrawPolygon(vertices, triangles[i].color);
 	}
