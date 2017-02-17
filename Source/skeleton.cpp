@@ -131,40 +131,35 @@ void VertexShader( const vec3& v, Pixel& p )
 
 }
 
-void PixelShader( const Pixel& p )
-{
-	int x = p.x;
-	int y = p.y;
-	if( p.zinv > depthBuffer[y][x] )
-	{
-		depthBuffer[y][x] = f.zinv;
-		PutPixelSDL( screen, x, y, currentColor );
-	}
-}
+// void PixelShader( const Pixel& p )
+// {
+// 	int x = p.x;
+// 	int y = p.y;
+// 	if( p.zinv > depthBuffer[y][x] )
+// 	{
+// 		depthBuffer[y][x] = f.zinv;
+// 		PutPixelSDL( screen, x, y, currentColor );
+// 	}
+// }
 
-void Interpolate( Pixel a, Pixel b, vector<ivec2>& result ){
+void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
+{
 	vec2 _a = vec2(a.x, a.y);
 	vec2 _b = vec2(b.x, b.y);
 
 	int N = result.size();
 	vec2 step = vec2(_b - _a) / float(max(N-1,1));
 	vec2 current( _a );
-	for( int i=0; i<N; ++i )
-	{
-		result[i] = current;
-		current += step;
-	}
-}
 
-void InterpolateDepth( Pixel a, Pixel b, vector<float>& resultDepth )
-{
-	int N = resultDepth.size();
-	float step = (b.zinv - a.zinv) / float(max(N-1,1));
-	float current = a.zinv;
+	float depthStep = (b.zinv - a.zinv) / float(max(N-1,1));
+	float currentDepth = a.zinv;
 	for( int i=0; i<N; ++i )
 	{
-		resultDepth[i] = current;
+		result[i].x = current.x;
+		result[i].y = current.y;
+		result[i].zinv = currentDepth;
 		current += step;
+		currentDepth += depthStep;
 	}
 }
 
@@ -175,16 +170,14 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 
 	ivec2 delta = abs(_a - _b);
 	int pixels = max(delta.x, delta.y) + 1;
-	vector<ivec2> result(pixels);
-	vector<float> resultDepth(pixels);
+	vector<Pixel> result(pixels);
 	Interpolate(a, b, result);
-	InterpolateDepth(a, b, resultDepth);
 	for( uint j = 0; j < result.size(); ++j )
 	{
-		if(depthBuffer[result[j].x][result[j].y] < resultDepth[j]){
-			depthBuffer[result[j].x][result[j].y] = resultDepth[j];
-			PutPixelSDL( screen, result[j].x, result[j].y, color );
-		}
+	 	if(depthBuffer[result[j].x][result[j].y] < result[j].zinv){
+	 		depthBuffer[result[j].x][result[j].y] = result[j].zinv;
+	 		PutPixelSDL( screen, result[j].x, result[j].y, color );
+	 	}
 	}
 }
 
@@ -218,10 +211,8 @@ void ComputePolygonRows( const vector<Pixel>& vertexPixels, vector<Pixel>& leftP
 	{
 		int ne = (e+1)%3; //next edge
 		int edgePixels = abs(vertexPixels[e].y - vertexPixels[ne].y) + 1;
-		vector<ivec2> result(edgePixels);
-		vector<float> resultDepth(edgePixels);
+		vector<Pixel> result(edgePixels);
 		Interpolate(vertexPixels[e], vertexPixels[ne], result);
-		InterpolateDepth(vertexPixels[e], vertexPixels[ne], resultDepth);
 		for (uint i=0; i<result.size(); ++i) 
 		{
 			//Obtain the relative index (1 to rows) of the interpolated point of the edge
@@ -230,12 +221,12 @@ void ComputePolygonRows( const vector<Pixel>& vertexPixels, vector<Pixel>& leftP
 			if(result[i].x < leftPixels[index].x)
 			{
 				leftPixels[index].x = result[i].x;
-				leftPixels[index].zinv = resultDepth[i];
+				leftPixels[index].zinv = result[i].zinv;
 			}
 			if(result[i].x > rightPixels[index].x)
 			{
 				rightPixels[index].x = result[i].x;
-				rightPixels[index].zinv = resultDepth[i];
+				rightPixels[index].zinv = result[i].zinv;
 			}  
 		}
 	}
