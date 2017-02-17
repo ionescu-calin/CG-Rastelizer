@@ -152,8 +152,9 @@ void VertexShader( const Vertex& v, Pixel& p )
 	vec3 term1 = lightPower * max(dot(r,n), 0.f);
 	float term2 = 4.0f * M_PI * radius * radius;
 	vec3 D = term1/term2;
+	vec3 R = v.reflectance * (D + indirectLightPowerPerArea);
 
-	p.illumination = D;
+	p.illumination = R;
 }
 
 void PixelShader( const Pixel& p, vec3 currentColor )
@@ -201,12 +202,18 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 
 	ivec2 delta = abs(_a - _b);
 	int pixels = max(delta.x, delta.y) + 1;
+	cout<< a.illumination.x << " " << a.illumination.y << "\n";
+	cout<< b.illumination.x << " " << b.illumination.y << "\n";
+
 	vector<Pixel> result(pixels);
 	Interpolate(a, b, result);
+
+	vec3 initialColor = color;
 	for( uint j = 0; j < result.size(); ++j )
 	{
-	 	color = color * (result[j].illumination + indirectLightPowerPerArea);
+	 	color = color * result[j].illumination;
 	 	PixelShader(result[j], color);
+	 	color = initialColor;
 	}
 }
 
@@ -313,7 +320,7 @@ void Draw()
 		for( int j=0; j<2; ++j )
 		{
 			vertices[j].normal = triangles[j].normal;
-			vertices[j].reflectance = vec3(0.01f, 0.01f, 0.01f);
+			vertices[j].reflectance = vec3(1.0f, 1.0f, 1.0f);
 		}
 
 		DrawPolygon(vertices, triangles[i].color);
