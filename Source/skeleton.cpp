@@ -27,6 +27,12 @@ float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
+/*LIGHT VALUES*/
+
+vec3 lightPos(0,-0.5,-0.7);
+vec3 lightPower = 1.1f*vec3( 1, 1, 1 );
+vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
+
 /* STRUCTS */
 
 struct Pixel
@@ -34,11 +40,14 @@ struct Pixel
     int x;
     int y;
     float zinv;
+    vec3 illumination;
 };
 
 struct Vertex
 {
 	vec3 position;
+	vec3 normal;
+	vec3 reflectance;
 };
 
 /* ----------------------------------------------------------------------------*/
@@ -136,6 +145,15 @@ void VertexShader( const Vertex& v, Pixel& p )
 	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
 	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
 
+	//Computing the illumination for every vertex
+	float radius = glm::distance(lightPos, v.position);
+	vec3 r = normalize(lightPos - v.position);
+	vec3 n = v.normal;
+	vec3 term1 = lightPower * max(dot(r,n), 0.f);
+	float term2 = 4.0f * M_PI * radius * radius;
+	vec3 D = term1/term2;
+
+	p.illumination = D;
 }
 
 void PixelShader( const Pixel& p, vec3 currentColor )
@@ -160,13 +178,19 @@ void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 
 	float depthStep = (b.zinv - a.zinv) / float(max(N-1,1));
 	float currentDepth = a.zinv;
+
+	vec3 lightStep = (b.illumination - a.illumination) / float(max(N-1,1));
+	vec3 currentLight = a.illumination;
 	for( int i=0; i<N; ++i )
 	{
 		result[i].x = current.x;
 		result[i].y = current.y;
 		result[i].zinv = currentDepth;
+		result[i].illumination = currentLight;
+
 		current += step;
 		currentDepth += depthStep;
+		currentLight += lightStep;
 	}
 }
 
@@ -181,6 +205,7 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 	Interpolate(a, b, result);
 	for( uint j = 0; j < result.size(); ++j )
 	{
+	 	color = color * (result[j].illumination + indirectLightPowerPerArea);
 	 	PixelShader(result[j], color);
 	}
 }
@@ -226,11 +251,13 @@ void ComputePolygonRows( const vector<Pixel>& vertexPixels, vector<Pixel>& leftP
 			{
 				leftPixels[index].x = result[i].x;
 				leftPixels[index].zinv = result[i].zinv;
+				leftPixels[index].illumination = result[i].illumination;
 			}
 			if(result[i].x > rightPixels[index].x)
 			{
 				rightPixels[index].x = result[i].x;
 				rightPixels[index].zinv = result[i].zinv;
+				rightPixels[index].illumination = result[i].illumination;
 			}  
 		}
 	}
@@ -282,6 +309,12 @@ void Draw()
 		vertices[0].position = triangles[i].v0;
 		vertices[1].position = triangles[i].v1;
 		vertices[2].position = triangles[i].v2;
+
+		for( int j=0; j<2; ++j )
+		{
+			vertices[j].normal = triangles[j].normal;
+			vertices[j].reflectance = vec3(0.01f, 0.01f, 0.01f);
+		}
 
 		DrawPolygon(vertices, triangles[i].color);
 	}
