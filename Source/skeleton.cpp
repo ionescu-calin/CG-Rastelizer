@@ -27,8 +27,7 @@ float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
-/* ----------------------------------------------------------------------------*/
-/* FUNCTIONS                                                                   */
+/* STRUCTS */
 
 struct Pixel
 {
@@ -36,6 +35,14 @@ struct Pixel
     int y;
     float zinv;
 };
+
+struct Vertex
+{
+	vec3 position;
+};
+
+/* ----------------------------------------------------------------------------*/
+/* FUNCTIONS                                                                   */
 
 void Update();
 void Draw();
@@ -116,9 +123,9 @@ void Update()
 	}
 }
 
-void VertexShader( const vec3& v, Pixel& p ) 
+void VertexShader( const Vertex& v, Pixel& p ) 
 {
-	vec3 p_p = vec3(v[0], v[1], v[2]);	
+	vec3 p_p = vec3(v.position.x, v.position.y, v.position.z);	
 
 	p_p = (p_p - cameraPos) * cameraR;
 
@@ -131,16 +138,16 @@ void VertexShader( const vec3& v, Pixel& p )
 
 }
 
-// void PixelShader( const Pixel& p )
-// {
-// 	int x = p.x;
-// 	int y = p.y;
-// 	if( p.zinv > depthBuffer[y][x] )
-// 	{
-// 		depthBuffer[y][x] = f.zinv;
-// 		PutPixelSDL( screen, x, y, currentColor );
-// 	}
-// }
+void PixelShader( const Pixel& p, vec3 currentColor )
+{
+	int x = p.x;
+	int y = p.y;
+	if( p.zinv > depthBuffer[y][x] )
+	{
+		depthBuffer[y][x] = p.zinv;
+		PutPixelSDL( screen, x, y, currentColor );
+	}
+}
 
 void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 {
@@ -174,10 +181,7 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 	Interpolate(a, b, result);
 	for( uint j = 0; j < result.size(); ++j )
 	{
-	 	if(depthBuffer[result[j].x][result[j].y] < result[j].zinv){
-	 		depthBuffer[result[j].x][result[j].y] = result[j].zinv;
-	 		PutPixelSDL( screen, result[j].x, result[j].y, color );
-	 	}
+	 	PixelShader(result[j], color);
 	}
 }
 
@@ -243,7 +247,7 @@ void DrawRows( const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels
 	}
 }
 
-void DrawPolygon( const vector<vec3>& vertices, vec3 color )
+void DrawPolygon( const vector<Vertex>& vertices, vec3 color )
 {
     int V = vertices.size();
     vector<Pixel> vertexPixels( V );
@@ -273,12 +277,11 @@ void Draw()
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
-		vector<vec3> vertices(3);
-		vector<ivec2> vertices2D(3);
+		vector<Vertex> vertices(3);
 
-		vertices[0] = triangles[i].v0;
-		vertices[1] = triangles[i].v1;
-		vertices[2] = triangles[i].v2;
+		vertices[0].position = triangles[i].v0;
+		vertices[1].position = triangles[i].v1;
+		vertices[2].position = triangles[i].v2;
 
 		DrawPolygon(vertices, triangles[i].color);
 	}
