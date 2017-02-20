@@ -11,8 +11,8 @@ using glm::mat3;
 using glm::ivec2;
 
 #define RotationSpeed 0.05f	//Camera rotation speed
-#define MoveSpeed 0.2f
-#define LightMoveSpeed 0.2f
+#define MoveSpeed 0.05f
+#define LightMoveSpeed 0.01f
 
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
@@ -30,8 +30,8 @@ vector<Triangle> triangles;
 
 /*LIGHT VALUES*/
 
-vec3 lightPos(0,-0.5,-0.7);
-vec3 lightPower = 1.1f*vec3( 1.0f, 1.0f, 1.0f );
+vec3 lightPos(0.f,-0.5f,-0.7f);
+vec3 lightPower = 11.1f*vec3( 1.0f, 1.0f, 1.0f );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 
 /* STRUCTS */
@@ -147,6 +147,12 @@ void Update()
     if( keystate[SDLK_s] ) {
 		lightPos.y += LightMoveSpeed;	//Down
 	}
+	if( keystate[SDLK_x] ) {
+		lightPos.z += LightMoveSpeed;	//Down
+	}
+	if( keystate[SDLK_z] ) {
+		lightPos.z -= LightMoveSpeed;	//Down
+	}
 }
 
 void VertexShader( const Vertex& v, Pixel& p ) 
@@ -226,7 +232,6 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 	for( uint j = 0; j < result.size(); ++j )
 	{
 	 	PixelShader(result[j], color * result[j].illumination);
-	 	//color = initialColor;
 	}
 }
 
@@ -333,7 +338,7 @@ void Draw()
 		for( int j=0; j<3; ++j )
 		{
 			vertices[j].normal = triangles[j].normal;
-			vertices[j].reflectance = vec3(1.0f, 1.0f, 1.0f);
+			vertices[j].reflectance = triangles[i].color;
 		}
 
 		DrawPolygon(vertices, triangles[i].color);
