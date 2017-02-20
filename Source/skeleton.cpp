@@ -12,6 +12,7 @@ using glm::ivec2;
 
 #define RotationSpeed 0.05f	//Camera rotation speed
 #define MoveSpeed 0.2f
+#define LightMoveSpeed 0.2f
 
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
@@ -30,7 +31,7 @@ vector<Triangle> triangles;
 /*LIGHT VALUES*/
 
 vec3 lightPos(0,-0.5,-0.7);
-vec3 lightPower = 1.1f*vec3( 1, 1, 1 );
+vec3 lightPower = 1.1f*vec3( 1.0f, 1.0f, 1.0f );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 
 /* STRUCTS */
@@ -130,6 +131,22 @@ void Update()
 		yaw -= RotationSpeed;
 		cameraR = mat3(cos(yaw), 0, sin(yaw), 0, 1, 0, -sin(yaw), 0, cos(yaw));
 	}
+
+		//Control lights WASD
+    if( keystate[SDLK_a] )
+    {
+		lightPos.x -= LightMoveSpeed;	//Left
+    }
+    if( keystate[SDLK_d] ) {
+		lightPos.x += LightMoveSpeed;	//Right
+	}
+    if( keystate[SDLK_w] )
+    {
+		lightPos.y -= LightMoveSpeed;	//Up
+    }
+    if( keystate[SDLK_s] ) {
+		lightPos.y += LightMoveSpeed;	//Down
+	}
 }
 
 void VertexShader( const Vertex& v, Pixel& p ) 
@@ -202,17 +219,13 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 
 	ivec2 delta = abs(_a - _b);
 	int pixels = max(delta.x, delta.y) + 1;
-	cout<< a.illumination.x << " " << a.illumination.y << "\n";
-	cout<< b.illumination.x << " " << b.illumination.y << "\n";
 
 	vector<Pixel> result(pixels);
 	Interpolate(a, b, result);
 
-	vec3 initialColor = color;
 	for( uint j = 0; j < result.size(); ++j )
 	{
-	 	color = color * result[j].illumination;
-	 	PixelShader(result[j], color);
+	 	PixelShader(result[j], color * result[j].illumination);
 	 	//color = initialColor;
 	}
 }
@@ -317,7 +330,7 @@ void Draw()
 		vertices[1].position = triangles[i].v1;
 		vertices[2].position = triangles[i].v2;
 
-		for( int j=0; j<2; ++j )
+		for( int j=0; j<3; ++j )
 		{
 			vertices[j].normal = triangles[j].normal;
 			vertices[j].reflectance = vec3(1.0f, 1.0f, 1.0f);
