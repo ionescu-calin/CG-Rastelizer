@@ -11,7 +11,8 @@ using glm::mat3;
 using glm::ivec2;
 
 #define RotationSpeed 0.05f	//Camera rotation speed
-#define MoveSpeed 0.2f
+#define MoveSpeed 0.05f
+#define LightMoveSpeed 0.01f
 
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
@@ -27,15 +28,31 @@ float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
-/* ----------------------------------------------------------------------------*/
-/* FUNCTIONS                                                                   */
+/*LIGHT VALUES*/
+
+vec3 lightPos(0.f,-0.5f,-0.7f);
+vec3 lightPower = 11.1f*vec3( 1.0f, 1.0f, 1.0f );
+vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
+
+/* STRUCTS */
 
 struct Pixel
 {
     int x;
     int y;
     float zinv;
+    vec3 illumination;
 };
+
+struct Vertex
+{
+	vec3 position;
+	vec3 normal;
+	vec3 reflectance;
+};
+
+/* ----------------------------------------------------------------------------*/
+/* FUNCTIONS                                                                   */
 
 void Update();
 void Draw();
@@ -114,11 +131,33 @@ void Update()
 		yaw -= RotationSpeed;
 		cameraR = mat3(cos(yaw), 0, sin(yaw), 0, 1, 0, -sin(yaw), 0, cos(yaw));
 	}
+
+		//Control lights WASD
+    if( keystate[SDLK_a] )
+    {
+		lightPos.x -= LightMoveSpeed;	//Left
+    }
+    if( keystate[SDLK_d] ) {
+		lightPos.x += LightMoveSpeed;	//Right
+	}
+    if( keystate[SDLK_w] )
+    {
+		lightPos.y -= LightMoveSpeed;	//Up
+    }
+    if( keystate[SDLK_s] ) {
+		lightPos.y += LightMoveSpeed;	//Down
+	}
+	if( keystate[SDLK_x] ) {
+		lightPos.z += LightMoveSpeed;	//Down
+	}
+	if( keystate[SDLK_z] ) {
+		lightPos.z -= LightMoveSpeed;	//Down
+	}
 }
 
-void VertexShader( const vec3& v, Pixel& p ) 
+void VertexShader( const Vertex& v, Pixel& p ) 
 {
-	vec3 p_p = vec3(v[0], v[1], v[2]);	
+	vec3 p_p = vec3(v.position.x, v.position.y, v.position.z);	
 
 	p_p = (p_p - cameraPos) * cameraR;
 
@@ -129,18 +168,28 @@ void VertexShader( const vec3& v, Pixel& p )
 	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
 	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
 
+	//Computing the illumination for every vertex
+	float radius = glm::distance(lightPos, v.position);
+	vec3 r = normalize(lightPos - v.position);
+	vec3 n = v.normal;
+	vec3 term1 = lightPower * max(dot(r,n), 0.f);
+	float term2 = 4.0f * M_PI * radius * radius;
+	vec3 D = term1/term2;
+	vec3 R = v.reflectance * (D + indirectLightPowerPerArea);
+
+	p.illumination = R;
 }
 
-// void PixelShader( const Pixel& p )
-// {
-// 	int x = p.x;
-// 	int y = p.y;
-// 	if( p.zinv > depthBuffer[y][x] )
-// 	{
-// 		depthBuffer[y][x] = f.zinv;
-// 		PutPixelSDL( screen, x, y, currentColor );
-// 	}
-// }
+void PixelShader( const Pixel& p, vec3 currentColor )
+{
+	int x = p.x;
+	int y = p.y;
+	if( p.zinv > depthBuffer[y][x] )
+	{
+		depthBuffer[y][x] = p.zinv;
+		PutPixelSDL( screen, x, y, currentColor );
+	}
+}
 
 void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 {
@@ -153,13 +202,19 @@ void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 
 	float depthStep = (b.zinv - a.zinv) / float(max(N-1,1));
 	float currentDepth = a.zinv;
+
+	vec3 lightStep = (b.illumination - a.illumination) / float(max(N-1,1));
+	vec3 currentLight = a.illumination;
 	for( int i=0; i<N; ++i )
 	{
 		result[i].x = current.x;
 		result[i].y = current.y;
 		result[i].zinv = currentDepth;
+		result[i].illumination = currentLight;
+
 		current += step;
 		currentDepth += depthStep;
+		currentLight += lightStep;
 	}
 }
 
@@ -170,14 +225,13 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 
 	ivec2 delta = abs(_a - _b);
 	int pixels = max(delta.x, delta.y) + 1;
+
 	vector<Pixel> result(pixels);
 	Interpolate(a, b, result);
+
 	for( uint j = 0; j < result.size(); ++j )
 	{
-	 	if(depthBuffer[result[j].x][result[j].y] < result[j].zinv){
-	 		depthBuffer[result[j].x][result[j].y] = result[j].zinv;
-	 		PutPixelSDL( screen, result[j].x, result[j].y, color );
-	 	}
+	 	PixelShader(result[j], color * result[j].illumination);
 	}
 }
 
@@ -222,11 +276,13 @@ void ComputePolygonRows( const vector<Pixel>& vertexPixels, vector<Pixel>& leftP
 			{
 				leftPixels[index].x = result[i].x;
 				leftPixels[index].zinv = result[i].zinv;
+				leftPixels[index].illumination = result[i].illumination;
 			}
 			if(result[i].x > rightPixels[index].x)
 			{
 				rightPixels[index].x = result[i].x;
 				rightPixels[index].zinv = result[i].zinv;
+				rightPixels[index].illumination = result[i].illumination;
 			}  
 		}
 	}
@@ -243,7 +299,7 @@ void DrawRows( const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels
 	}
 }
 
-void DrawPolygon( const vector<vec3>& vertices, vec3 color )
+void DrawPolygon( const vector<Vertex>& vertices, vec3 color )
 {
     int V = vertices.size();
     vector<Pixel> vertexPixels( V );
@@ -273,12 +329,17 @@ void Draw()
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
-		vector<vec3> vertices(3);
-		vector<ivec2> vertices2D(3);
+		vector<Vertex> vertices(3);
 
-		vertices[0] = triangles[i].v0;
-		vertices[1] = triangles[i].v1;
-		vertices[2] = triangles[i].v2;
+		vertices[0].position = triangles[i].v0;
+		vertices[1].position = triangles[i].v1;
+		vertices[2].position = triangles[i].v2;
+
+		for( int j=0; j<3; ++j )
+		{
+			vertices[j].normal = triangles[j].normal;
+			vertices[j].reflectance = triangles[i].color;
+		}
 
 		DrawPolygon(vertices, triangles[i].color);
 	}
