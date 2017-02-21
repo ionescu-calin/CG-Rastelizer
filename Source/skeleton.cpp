@@ -192,7 +192,6 @@ vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 curren
 
 void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentReflactance )
 {
-	//p.pos3d = p.pos3d * p.z_value;
 	int x = p.x;
 	int y = p.y;
 	if( p.zinv > depthBuffer[y][x] )
@@ -217,6 +216,7 @@ void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 
 	vec3 posStep = (b.pos3d - a.pos3d) / float(max(N-1,1));
 	vec3 currentPos = a.pos3d;
+	
 	for( int i=0; i<N; ++i )
 	{
 		result[i].x = current.x;
