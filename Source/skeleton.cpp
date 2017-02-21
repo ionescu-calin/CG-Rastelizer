@@ -42,6 +42,7 @@ struct Pixel
     int y;
     float zinv;
     vec3 pos3d;
+    float z_value;
 };
 
 struct Vertex
@@ -172,6 +173,9 @@ void VertexShader( const Vertex& v, Pixel& p )
 	p.pos3d.x = v.position.x;
 	p.pos3d.y = v.position.y;
 	p.pos3d.z = v.position.z;
+	
+	p.pos3d = p.pos3d/p_p.z;
+	p.z_value = p_p.z;
 }
 
 vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance )
@@ -186,8 +190,9 @@ vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 curren
 	return currentReflactance * (D + indirectLightPowerPerArea);
 }
 
-void PixelShader( const Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentReflactance )
+void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentReflactance )
 {
+	//p.pos3d = p.pos3d * p.z_value;
 	int x = p.x;
 	int y = p.y;
 	if( p.zinv > depthBuffer[y][x] )
@@ -209,9 +214,6 @@ void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 
 	float depthStep = (b.zinv - a.zinv) / float(max(N-1,1));
 	float currentDepth = a.zinv;
-
-	// a.pos3d.z = 1/a.pos3d.z;
-	// b.pos3d.z = 1/b.pos3d.z;
 
 	vec3 posStep = (b.pos3d - a.pos3d) / float(max(N-1,1));
 	vec3 currentPos = a.pos3d;
