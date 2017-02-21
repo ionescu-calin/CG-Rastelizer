@@ -41,14 +41,12 @@ struct Pixel
     int x;
     int y;
     float zinv;
-    vec3 illumination;
+    vec3 pos3d;
 };
 
 struct Vertex
 {
 	vec3 position;
-	vec3 normal;
-	vec3 reflectance;
 };
 
 /* ----------------------------------------------------------------------------*/
@@ -58,11 +56,12 @@ void Update();
 void Draw();
 void VertexShader( const vec3& v, Pixel& p );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
-void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
+void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color, vec3 currentNormal, vec3 currentReflactance );
 void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels );
-void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color );
-void DrawPolygon( const vector<vec3>& vertices, vec3 color );
-void PixelShader( const Pixel& p );
+void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color, vec3 currentNormal, vec3 currentReflactance );
+void DrawPolygon( const vector<vec3>& vertices, vec3 color, vec3 currentNormal, vec3 currentReflactance );
+void PixelShader( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
+vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 
 int main( int argc, char* argv[] )
 {
@@ -168,26 +167,34 @@ void VertexShader( const Vertex& v, Pixel& p )
 	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
 	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
 
-	//Computing the illumination for every vertex
-	float radius = glm::distance(lightPos, v.position);
-	vec3 r = normalize(lightPos - v.position);
-	vec3 n = v.normal;
+	//Storing the 3D position of the Vertex to the corresponding 
+	//variable in Pixel
+	p.pos3d.x = v.position.x;
+	p.pos3d.y = v.position.y;
+	p.pos3d.z = v.position.z;
+}
+
+vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance )
+{
+	float radius = glm::distance(lightPos, p.pos3d);
+	vec3 r = normalize(lightPos - p.pos3d);
+	vec3 n = currentNormal;
 	vec3 term1 = lightPower * max(dot(r,n), 0.f);
 	float term2 = 4.0f * M_PI * radius * radius;
 	vec3 D = term1/term2;
-	vec3 R = v.reflectance * (D + indirectLightPowerPerArea);
-
-	p.illumination = R;
+	
+	return currentReflactance * (D + indirectLightPowerPerArea);
 }
 
-void PixelShader( const Pixel& p, vec3 currentColor )
+void PixelShader( const Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentReflactance )
 {
 	int x = p.x;
 	int y = p.y;
 	if( p.zinv > depthBuffer[y][x] )
 	{
 		depthBuffer[y][x] = p.zinv;
-		PutPixelSDL( screen, x, y, currentColor );
+		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+		PutPixelSDL( screen, x, y, currentColor * R);
 	}
 }
 
@@ -203,22 +210,25 @@ void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
 	float depthStep = (b.zinv - a.zinv) / float(max(N-1,1));
 	float currentDepth = a.zinv;
 
-	vec3 lightStep = (b.illumination - a.illumination) / float(max(N-1,1));
-	vec3 currentLight = a.illumination;
+	// a.pos3d.z = 1/a.pos3d.z;
+	// b.pos3d.z = 1/b.pos3d.z;
+
+	vec3 posStep = (b.pos3d - a.pos3d) / float(max(N-1,1));
+	vec3 currentPos = a.pos3d;
 	for( int i=0; i<N; ++i )
 	{
 		result[i].x = current.x;
 		result[i].y = current.y;
 		result[i].zinv = currentDepth;
-		result[i].illumination = currentLight;
+		result[i].pos3d = currentPos;
 
 		current += step;
 		currentDepth += depthStep;
-		currentLight += lightStep;
+		currentPos += posStep;
 	}
 }
 
-void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
+void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color, vec3 currentNormal, vec3 currentReflactance )
 {
 	vec2 _a = vec2(a.x, a.y);
 	vec2 _b = vec2(b.x, b.y);
@@ -231,7 +241,7 @@ void DrawLineSDL( SDL_Surface* surface, Pixel a, Pixel b, vec3 color )
 
 	for( uint j = 0; j < result.size(); ++j )
 	{
-	 	PixelShader(result[j], color * result[j].illumination);
+	 	PixelShader(result[j], color, currentNormal, currentReflactance);
 	}
 }
 
@@ -276,30 +286,30 @@ void ComputePolygonRows( const vector<Pixel>& vertexPixels, vector<Pixel>& leftP
 			{
 				leftPixels[index].x = result[i].x;
 				leftPixels[index].zinv = result[i].zinv;
-				leftPixels[index].illumination = result[i].illumination;
+				leftPixels[index].pos3d = result[i].pos3d;
 			}
 			if(result[i].x > rightPixels[index].x)
 			{
 				rightPixels[index].x = result[i].x;
 				rightPixels[index].zinv = result[i].zinv;
-				rightPixels[index].illumination = result[i].illumination;
+				rightPixels[index].pos3d = result[i].pos3d;
 			}  
 		}
 	}
 }
 
-void DrawRows( const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels, vec3 color ) 
+void DrawRows( const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels, vec3 color, vec3 currentNormal, vec3 currentReflactance ) 
 {
 	for(uint i=0; i<leftPixels.size(); i++) 
 	{
 		if( (leftPixels[i].y < SCREEN_HEIGHT && leftPixels[i].y > 0) || (rightPixels[i].y < SCREEN_HEIGHT && rightPixels[i].y > 0)) 
 		{
-			DrawLineSDL(screen,leftPixels[i],rightPixels[i],color);
+			DrawLineSDL(screen,leftPixels[i],rightPixels[i],color, currentNormal, currentReflactance);
 		}
 	}
 }
 
-void DrawPolygon( const vector<Vertex>& vertices, vec3 color )
+void DrawPolygon( const vector<Vertex>& vertices, vec3 color, vec3 currentNormal, vec3 currentReflactance )
 {
     int V = vertices.size();
     vector<Pixel> vertexPixels( V );
@@ -308,7 +318,7 @@ void DrawPolygon( const vector<Vertex>& vertices, vec3 color )
     vector<Pixel> leftPixels;
     vector<Pixel> rightPixels;
     ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	DrawRows( leftPixels, rightPixels, color);
+	DrawRows( leftPixels, rightPixels, color, currentNormal, currentReflactance);
 }
 
 
@@ -335,13 +345,10 @@ void Draw()
 		vertices[1].position = triangles[i].v1;
 		vertices[2].position = triangles[i].v2;
 
-		for( int j=0; j<3; ++j )
-		{
-			vertices[j].normal = triangles[j].normal;
-			vertices[j].reflectance = triangles[i].color;
-		}
+		vec3 currentNormal = triangles[i].normal;
+		vec3 currentReflactance = triangles[i].color;
 
-		DrawPolygon(vertices, triangles[i].color);
+		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
 
     if ( SDL_MUSTLOCK(screen) )
