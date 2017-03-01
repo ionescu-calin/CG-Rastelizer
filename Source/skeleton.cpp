@@ -161,6 +161,7 @@ void Update()
 		lightPos.z += LightMoveSpeed;	//Down
 		lightDirection.z += LightMoveSpeed;
 	}
+
 	if( keystate[SDLK_z] ) {
 		lightPos.z -= LightMoveSpeed;	//Down
 		lightDirection.z -= LightMoveSpeed;
@@ -220,8 +221,8 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 	if( p.zinv > depthBuffer[y][x] )
 	{
 		depthBuffer[y][x] = p.zinv;
-		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-		R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
+		//vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+		vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
 		PutPixelSDL( screen, x, y, currentColor * R);
 	}
 }
