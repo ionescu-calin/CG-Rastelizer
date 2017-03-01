@@ -21,6 +21,7 @@ const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
 SDL_Surface* screen;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+//float lightDepthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
@@ -28,11 +29,14 @@ float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
-/*LIGHT VALUES*/
+/*LIGHT VALUES - POINT LIGHT*/
 
 vec3 lightPos(0.f,-0.5f,-0.7f);
-vec3 lightPower = 11.1f*vec3( 1.0f, 1.0f, 1.0f );
+vec3 lightPower = 5.1f*vec3( 1.0f, 1.0f, 1.0f );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
+
+/*DIRECTIONAL LIGHT*/
+vec3 lightDirection(1.f, -0.5f, -0.7f);
 
 /* STRUCTS */
 
@@ -43,6 +47,7 @@ struct Pixel
     float zinv;
     vec3 pos3d;
     float z_value;
+    vec3 toLight; //Keeps the distance to light
 };
 
 struct Vertex
@@ -63,6 +68,7 @@ void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels
 void DrawPolygon( const vector<vec3>& vertices, vec3 color, vec3 currentNormal, vec3 currentReflactance );
 void PixelShader( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
+vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 
 int main( int argc, char* argv[] )
 {
@@ -136,22 +142,28 @@ void Update()
     if( keystate[SDLK_a] )
     {
 		lightPos.x -= LightMoveSpeed;	//Left
+		lightDirection.x -= LightMoveSpeed;
     }
     if( keystate[SDLK_d] ) {
 		lightPos.x += LightMoveSpeed;	//Right
+		lightDirection.x += LightMoveSpeed;
 	}
     if( keystate[SDLK_w] )
     {
 		lightPos.y -= LightMoveSpeed;	//Up
+		lightDirection.y -= LightMoveSpeed;
     }
     if( keystate[SDLK_s] ) {
 		lightPos.y += LightMoveSpeed;	//Down
+		lightDirection.y += LightMoveSpeed;
 	}
 	if( keystate[SDLK_x] ) {
 		lightPos.z += LightMoveSpeed;	//Down
+		lightDirection.z += LightMoveSpeed;
 	}
 	if( keystate[SDLK_z] ) {
 		lightPos.z -= LightMoveSpeed;	//Down
+		lightDirection.z -= LightMoveSpeed;
 	}
 }
 
@@ -176,6 +188,17 @@ void VertexShader( const Vertex& v, Pixel& p )
 	
 	p.pos3d = p.pos3d/p_p.z;
 	p.z_value = p_p.z;
+
+	p.toLight = normalize(p_p - lightPos);
+}
+
+vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance)
+{
+	vec3 n = currentNormal;
+	float diffuseIntensity = max(0.0f, dot(normalize(n), -lightDirection));
+	vec3 outputLight = currentReflactance * (indirectLightPowerPerArea + diffuseIntensity);
+
+	return outputLight;
 }
 
 vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance )
@@ -198,6 +221,7 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 	{
 		depthBuffer[y][x] = p.zinv;
 		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+		R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
 		PutPixelSDL( screen, x, y, currentColor * R);
 	}
 }
