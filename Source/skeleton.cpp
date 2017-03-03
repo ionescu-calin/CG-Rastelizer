@@ -15,31 +15,7 @@ using glm::ivec2;
 #define LightMoveSpeed 0.01f
 
 /* ----------------------------------------------------------------------------*/
-/* GLOBAL VARIABLES                                                            */
-
-const int SCREEN_WIDTH = 500;
-const int SCREEN_HEIGHT = 500;
-SDL_Surface* screen;
-float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
-//float lightDepthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
-int t;
-mat3 cameraR;
-vec3 cameraPos( 0, 0, -3.001 );
-float f = 1.0f;
-float yaw = 0.0f;
-vector<Triangle> triangles;
-
-/*LIGHT VALUES - POINT LIGHT*/
-
-vec3 lightPos(0.f,-0.5f,-0.7f);
-vec3 lightPower = 5.1f*vec3( 1.0f, 1.0f, 1.0f );
-vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
-
-/*DIRECTIONAL LIGHT*/
-vec3 lightDirection(1.f, -0.5f, -0.7f);
-
 /* STRUCTS */
-
 struct Pixel
 {
     int x;
@@ -55,6 +31,61 @@ struct Vertex
 	vec3 position;
 };
 
+struct Edge 
+{
+	vec3 v1;
+	vec3 v2;
+};
+
+struct Adjacencies
+{
+	vector<Triangle> triangles;
+	vector<vec3> v1;
+	vector<vec3> v2;
+};
+
+/*CLASSES*/
+//Used to define an object of triangular surfaces
+class Object
+{
+public:
+	std::vector<Triangle> triangles;
+	std::vector<Edge> silouhettes;
+
+	Object( std::vector<Triangle> triangles )
+		:triangles(triangles)
+	{
+
+	}
+};
+
+/* GLOBAL VARIABLES */
+const int SCREEN_WIDTH = 500;
+const int SCREEN_HEIGHT = 500;
+SDL_Surface* screen;
+float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+int t;
+mat3 cameraR;
+vec3 cameraPos( 0, 0, -3.001 );
+float f = 1.0f;
+float yaw = 0.0f;
+vector<Triangle> triangles;
+
+vector<Object> sceneObjects;
+vector<Triangle> redTriangles;
+vector<Triangle> blueTriangles;
+vec3 red( 0.75f, 0.15f, 0.15f );
+vec3 blue( 0.15f, 0.15f, 0.75f );
+
+/*LIGHT VALUES - POINT LIGHT*/
+
+vec3 lightPos(0.f,-0.5f,-0.7f);
+vec3 lightPower = 5.1f*vec3( 1.0f, 1.0f, 1.0f );
+vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
+
+/*DIRECTIONAL LIGHT*/
+vec3 lightDirection(1.f, -0.5f, -0.7f);
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
@@ -69,6 +100,8 @@ void DrawPolygon( const vector<vec3>& vertices, vec3 color, vec3 currentNormal, 
 void PixelShader( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
+void ComputeSilhouettes( vector<Object>& objects );
+void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacencies& adjacencies );
 
 int main( int argc, char* argv[] )
 {
@@ -76,6 +109,25 @@ int main( int argc, char* argv[] )
 
 	screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT );
 	t = SDL_GetTicks();	// Set start value for timer.
+
+	for( uint i=0; i < triangles.size(); ++i)
+	{
+		if(triangles[i].color == red)
+		{
+			redTriangles.push_back(Triangle( triangles[i].v0,  triangles[i].v1,  triangles[i].v2,  triangles[i].color));
+		}
+		if(triangles[i].color == blue)
+		{
+			blueTriangles.push_back(Triangle( triangles[i].v0,  triangles[i].v1,  triangles[i].v2,  triangles[i].color));
+		} 
+	}
+	
+	Object redCube(redTriangles);
+	Object blueCube(blueTriangles);
+	sceneObjects.push_back(redCube);
+	//sceneObjects.push_back(redCube);
+
+	ComputeSilhouettes(sceneObjects);
 
 	while( NoQuitMessageSDL() )
 	{
@@ -161,10 +213,86 @@ void Update()
 		lightPos.z += LightMoveSpeed;	//Down
 		lightDirection.z += LightMoveSpeed;
 	}
-
 	if( keystate[SDLK_z] ) {
 		lightPos.z -= LightMoveSpeed;	//Down
 		lightDirection.z -= LightMoveSpeed;
+	}
+}
+
+bool isAdjacent(Triangle triangle1, Triangle triangle2, vector<vec3>& v)
+{
+	int commonVertices = 0;
+
+	if(triangle1.v0 == triangle2.v0 || triangle1.v0 == triangle2.v1 || triangle1.v0 == triangle2.v2)
+	{
+		commonVertices++;
+		v.push_back(triangle1.v0);
+	}
+	if(triangle1.v1 == triangle2.v0 || triangle1.v1 == triangle2.v1 || triangle1.v1 == triangle2.v2)
+	{
+		commonVertices++;
+		v.push_back(triangle1.v1);
+	}
+	if( (triangle1.v2 == triangle2.v0 || triangle1.v2 == triangle2.v1 || triangle1.v2 == triangle2.v2) && commonVertices != 2 )
+	{
+		commonVertices++;
+		v.push_back(triangle1.v2);
+	}
+
+	return (commonVertices == 2);
+}
+
+bool isSameTriangle(Triangle triangle1, Triangle triangle2)
+{
+	return (triangle1.v0 == triangle2.v0 && triangle1.v1 == triangle2.v1 && triangle1.v2 == triangle2.v2);
+}
+
+void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacencies& adjacencies )
+{	
+	int index = 0;
+	vector<vec3> v;
+	for( uint i=0; i<triangles.size(); ++i )
+	{
+		if(!isSameTriangle(triangle, triangles[i]))
+		{
+			if(isAdjacent(triangle, triangles[i], v))
+			{
+				adjacencies.triangles[index] =  triangles[i];
+				adjacencies.v1[index] = v[0];
+				adjacencies.v2[index] = v[1];
+				index++;
+			}
+		}
+	}
+}
+
+void ComputeSilhouettes( vector<Object>& objects )
+{
+	Adjacencies adjacencies;
+
+	for( uint i=0; i<objects.size(); ++i )
+	{
+		for( uint j=0; j<objects[i].triangles.size(); ++j )
+		{
+			ComputeAdjacencies(objects[i].triangles[j], objects[i].triangles, adjacencies);
+			vec3 currentNormal = objects[i].triangles[j].normal;
+			float dir1 = dot(normalize(currentNormal), lightPos);
+			for( uint k=0; k<adjacencies.triangles.size(); ++k )
+			{	
+				vec3 normal = adjacencies.triangles[k].normal;
+				float dir2 = dot(normalize(normal), lightPos);
+				if(dir1 * dir2 < 0)
+				{
+					Edge edge;
+					edge.v1 = adjacencies.v1[k];
+					edge.v2 = adjacencies.v2[k];
+					objects[i].silouhettes.push_back(edge);
+				}
+			} 
+			adjacencies.triangles.clear();
+			adjacencies.v1.clear();
+			adjacencies.v2.clear();
+		}
 	}
 }
 
@@ -221,8 +349,8 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 	if( p.zinv > depthBuffer[y][x] )
 	{
 		depthBuffer[y][x] = p.zinv;
-		//vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-		vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
+		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+		// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
 		PutPixelSDL( screen, x, y, currentColor * R);
 	}
 }
@@ -374,7 +502,7 @@ void Draw()
 
 		vec3 currentNormal = triangles[i].normal;
 		vec3 currentReflactance = triangles[i].color;
-
+		
 		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
 
