@@ -233,7 +233,7 @@ bool isAdjacent(Triangle triangle1, Triangle triangle2, vector<vec3>& v)
 		commonVertices++;
 		v.push_back(triangle1.v1);
 	}
-	if( (triangle1.v2 == triangle2.v0 || triangle1.v2 == triangle2.v1 || triangle1.v2 == triangle2.v2) && commonVertices != 2 )
+	if( (triangle1.v2 == triangle2.v0 || triangle1.v2 == triangle2.v1 || triangle1.v2 == triangle2.v2) )
 	{
 		commonVertices++;
 		v.push_back(triangle1.v2);
