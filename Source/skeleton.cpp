@@ -255,7 +255,7 @@ void DrawSilouhetteEdges(vector<Object> sceneObjects)
 
 			VertexShader(vect1, p1);
 			VertexShader(vect2, p2);
-
+			
 			vec2 _p1 = vec2(p1.x, p1.y);
 			vec2 _p2 = vec2(p2.x, p2.y);
 
@@ -300,7 +300,6 @@ bool isSameTriangle(Triangle triangle1, Triangle triangle2)
 
 void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacencies& adjacencies )
 {	
-	int index = 0;
 	vector<vec3> v;
 	for( uint i=0; i<triangles.size(); ++i )
 	{
@@ -333,7 +332,6 @@ void ComputeSilhouettes( vector<Object>& objects )
 				float dir2 = dot(normalize(normal), lightPos);
 				if(dir1 * dir2 < 0)
 				{
-					cout << "found silouhette edge!" << endl;
 					Edge edge;
 					edge.v1 = adjacencies.v1[k];
 					edge.v2 = adjacencies.v2[k];
@@ -401,7 +399,7 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 	{
 		depthBuffer[y][x] = p.zinv;
 		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-		// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
+		// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance); //direct light
 		PutPixelSDL( screen, x, y, currentColor * R);
 	}
 }
