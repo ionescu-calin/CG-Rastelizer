@@ -50,7 +50,7 @@ class Object
 {
 public:
 	std::vector<Triangle> triangles;
-	std::vector<Edge> silouhettes;
+	std::vector<Edge> silouhette;
 
 	Object( std::vector<Triangle> triangles )
 		:triangles(triangles)
@@ -76,10 +76,10 @@ vector<Triangle> redTriangles;
 vector<Triangle> blueTriangles;
 vec3 red( 0.75f, 0.15f, 0.15f );
 vec3 blue( 0.15f, 0.15f, 0.75f );
+vec3 pink( 1.000, 0.078, 0.576 );
 
 /*LIGHT VALUES - POINT LIGHT*/
-
-vec3 lightPos(0.f,-0.5f,-0.7f);
+vec3 lightPos(0.3f, 0.1f, -0.2f);//(0.f,-0.5f,-0.7f);
 vec3 lightPower = 5.1f*vec3( 1.0f, 1.0f, 1.0f );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 
@@ -91,8 +91,8 @@ vec3 lightDirection(1.f, -0.5f, -0.7f);
 
 void Update();
 void Draw();
-void VertexShader( const vec3& v, Pixel& p );
-void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
+void VertexShader( const Vertex& v, Pixel& p );
+void Interpolate( Pixel a, Pixel b, vector<Pixel>& result );
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color, vec3 currentNormal, vec3 currentReflactance );
 void ComputePolygonRows( const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels );
 void DrawRows( const vector<ivec2>& leftPixels, const vector<ivec2>& rightPixels, vec3 color, vec3 currentNormal, vec3 currentReflactance );
@@ -102,6 +102,9 @@ vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 curren
 vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 void ComputeSilhouettes( vector<Object>& objects );
 void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacencies& adjacencies );
+//Debugging functions
+void DrawSilouhetteEdges(vector<Object> sceneObjects);
+
 
 int main( int argc, char* argv[] )
 {
@@ -125,14 +128,16 @@ int main( int argc, char* argv[] )
 	Object redCube(redTriangles);
 	Object blueCube(blueTriangles);
 	sceneObjects.push_back(redCube);
-	//sceneObjects.push_back(redCube);
+	sceneObjects.push_back(blueCube);
 
 	ComputeSilhouettes(sceneObjects);
+	//debugging
+	DrawSilouhetteEdges(sceneObjects);
 
 	while( NoQuitMessageSDL() )
 	{
-		Update();
-		Draw();
+		//Update();
+		//Draw();
 	}
 
 	SDL_SaveBMP( screen, "screenshot.bmp" );
@@ -216,8 +221,54 @@ void Update()
 	if( keystate[SDLK_z] ) {
 		lightPos.z -= LightMoveSpeed;	//Down
 		lightDirection.z -= LightMoveSpeed;
+		cout << lightPos.x << "\n";
+		cout << lightPos.y << "\n";
+		cout << lightPos.z << "\n";
+
 	}
 }
+
+
+//Debugging functions
+void drawEdge(vector<Pixel> line)
+{
+	for( uint i=0; i<line.size(); ++i )
+	{
+		// cout << line[i].x << endl;
+		// cout << line[i].y << endl;
+		PutPixelSDL(screen, line[i].x, line[i].y, pink);
+	}
+}
+//--
+
+void DrawSilouhetteEdges(vector<Object> sceneObjects)
+{
+	Vertex vect1, vect2;
+	Pixel p1;
+	Pixel p2;
+	for( uint i=0; i<sceneObjects.size(); ++i )
+	{
+		for( uint j=0; j<sceneObjects[i].silouhette.size(); ++j )
+		{
+			vect1.position = sceneObjects[i].silouhette[j].v1;
+			vect2.position = sceneObjects[i].silouhette[j].v2;
+
+			VertexShader(vect1, p1);
+			VertexShader(vect2, p2);
+
+			vec2 _p1 = vec2(p1.x, p1.y);
+			vec2 _p2 = vec2(p2.x, p2.y);
+
+			ivec2 delta = abs(_p1 - _p2);
+			int pixels = max(delta.x, delta.y) + 1;
+			vector<Pixel> result(pixels);
+
+			Interpolate(p1, p2, result);
+			drawEdge(result);
+		}
+	}
+}
+
 
 bool isAdjacent(Triangle triangle1, Triangle triangle2, vector<vec3>& v)
 {
@@ -257,10 +308,9 @@ void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacenc
 		{
 			if(isAdjacent(triangle, triangles[i], v))
 			{
-				adjacencies.triangles[index] =  triangles[i];
-				adjacencies.v1[index] = v[0];
-				adjacencies.v2[index] = v[1];
-				index++;
+				adjacencies.triangles.push_back(triangles[i]);
+				adjacencies.v1.push_back(v[0]);
+				adjacencies.v2.push_back(v[1]);
 			}
 		}
 	}
@@ -283,10 +333,11 @@ void ComputeSilhouettes( vector<Object>& objects )
 				float dir2 = dot(normalize(normal), lightPos);
 				if(dir1 * dir2 < 0)
 				{
+					cout << "found silouhette edge!" << endl;
 					Edge edge;
 					edge.v1 = adjacencies.v1[k];
 					edge.v2 = adjacencies.v2[k];
-					objects[i].silouhettes.push_back(edge);
+					objects[i].silouhette.push_back(edge);
 				}
 			} 
 			adjacencies.triangles.clear();
@@ -475,7 +526,6 @@ void DrawPolygon( const vector<Vertex>& vertices, vec3 color, vec3 currentNormal
     ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
 	DrawRows( leftPixels, rightPixels, color, currentNormal, currentReflactance);
 }
-
 
 void Draw() 
 {
