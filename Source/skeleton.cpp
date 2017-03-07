@@ -67,7 +67,7 @@ float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
-float f = 1.0f;
+float f = 2.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
@@ -79,7 +79,7 @@ vec3 blue( 0.15f, 0.15f, 0.75f );
 vec3 pink( 1.000, 0.078, 0.576 );
 
 /*LIGHT VALUES - POINT LIGHT*/
-vec3 lightPos(0.3f, 0.1f, -0.2f);//(0.f,-0.5f,-0.7f);
+vec3 lightPos(0.21, 0.14, 0.17);//(0.01, -0.19, -0.29);//(0.f,-0.5f,-0.7f);//(0.3f, 0.1f, -0.2f);
 vec3 lightPower = 5.1f*vec3( 1.0f, 1.0f, 1.0f );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 
@@ -111,7 +111,7 @@ int main( int argc, char* argv[] )
 	LoadTestModel(triangles);
 
 	screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT );
-	t = SDL_GetTicks();	// Set start value for timer.
+	t = SDL_GetTicks();	// Set start value for timer. 
 
 	for( uint i=0; i < triangles.size(); ++i)
 	{
@@ -136,8 +136,9 @@ int main( int argc, char* argv[] )
 
 	while( NoQuitMessageSDL() )
 	{
-		//Update();
-		//Draw();
+		// Update();
+		// Draw();
+		ComputeSilhouettes(sceneObjects);
 	}
 
 	SDL_SaveBMP( screen, "screenshot.bmp" );
@@ -232,14 +233,14 @@ void Update()
 //Debugging functions
 void drawEdge(vector<Pixel> line)
 {
+	cout << "Starting drawing" << endl;
 	for( uint i=0; i<line.size(); ++i )
 	{
-		// cout << line[i].x << endl;
-		// cout << line[i].y << endl;
 		PutPixelSDL(screen, line[i].x, line[i].y, pink);
+		cout << "Pixel put!" << endl;
 	}
+	cout << "Finished edge!" << endl;
 }
-//--
 
 void DrawSilouhetteEdges(vector<Object> sceneObjects)
 {
@@ -267,7 +268,9 @@ void DrawSilouhetteEdges(vector<Object> sceneObjects)
 			drawEdge(result);
 		}
 	}
+	cout << "Finished drawing silouhettes!" << endl;
 }
+//--
 
 
 bool isAdjacent(Triangle triangle1, Triangle triangle2, vector<vec3>& v)
@@ -326,21 +329,24 @@ void ComputeSilhouettes( vector<Object>& objects )
 			ComputeAdjacencies(objects[i].triangles[j], objects[i].triangles, adjacencies);
 			vec3 currentNormal = objects[i].triangles[j].normal;
 			float dir1 = dot(normalize(currentNormal), lightPos);
-			for( uint k=0; k<adjacencies.triangles.size(); ++k )
-			{	
-				vec3 normal = adjacencies.triangles[k].normal;
-				float dir2 = dot(normalize(normal), lightPos);
-				if(dir1 * dir2 < 0)
-				{
-					Edge edge;
-					edge.v1 = adjacencies.v1[k];
-					edge.v2 = adjacencies.v2[k];
-					objects[i].silouhette.push_back(edge);
-				}
-			} 
-			adjacencies.triangles.clear();
-			adjacencies.v1.clear();
-			adjacencies.v2.clear();
+			if(dir1 >= 0)
+			{
+				for( uint k=0; k<adjacencies.triangles.size(); ++k )
+				{	
+					vec3 normal = adjacencies.triangles[k].normal;
+					float dir2 = dot(normalize(normal), lightPos);
+					if(dir1 * dir2 < 0)
+					{
+						Edge edge;
+						edge.v1 = adjacencies.v1[k];
+						edge.v2 = adjacencies.v2[k];
+						objects[i].silouhette.push_back(edge);
+					}
+				} 
+				adjacencies.triangles.clear();
+				adjacencies.v1.clear();
+				adjacencies.v2.clear();
+			}
 		}
 	}
 }
