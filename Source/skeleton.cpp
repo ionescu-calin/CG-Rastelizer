@@ -44,13 +44,22 @@ struct Adjacencies
 	vector<vec3> v2;
 };
 
+struct Quad
+{
+	vec3 v1;
+	vec3 v2;
+	vec3 v3;
+	vec3 v4;
+};
+
 /*CLASSES*/
 //Used to define an object of triangular surfaces
 class Object
 {
 public:
 	std::vector<Triangle> triangles;
-	std::vector<Edge> silouhette;
+	std::vector<Edge> silhouette;
+	std::vector<Quad> shadowQuads;
 
 	Object( std::vector<Triangle> triangles )
 		:triangles(triangles)
@@ -64,13 +73,13 @@ const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
 SDL_Surface* screen;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+int stencilBuffer[SCREEN_WIDTH][SCREEN_HEIGHT];
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
 float f = 2.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
-
 vector<Object> sceneObjects;
 vector<Triangle> redTriangles;
 vector<Triangle> blueTriangles;
@@ -86,6 +95,9 @@ vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 /*DIRECTIONAL LIGHT*/
 vec3 lightDirection(1.f, -0.5f, -0.7f);
 
+/*SHADOW VOLUME*/
+vec3 ExtrdudeMagnitude(10.f, 10.f, 10.f);
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
@@ -100,10 +112,11 @@ void DrawPolygon( const vector<vec3>& vertices, vec3 color, vec3 currentNormal, 
 void PixelShader( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
 vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance );
+vec3 ComputeAmbientLight( vec3 currentReflactance );
 void ComputeSilhouettes( vector<Object>& objects );
-void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacencies& adjacencies );
+void ComputeShadowQuads( vector<Object> objects );
 //Debugging functions
-void DrawSilouhetteEdges(vector<Object> sceneObjects);
+void DrawSilhouetteEdges(vector<Object> sceneObjects);
 
 
 int main( int argc, char* argv[] )
@@ -130,15 +143,10 @@ int main( int argc, char* argv[] )
 	sceneObjects.push_back(redCube);
 	sceneObjects.push_back(blueCube);
 
-	ComputeSilhouettes(sceneObjects);
-	//debugging
-	DrawSilouhetteEdges(sceneObjects);
-
 	while( NoQuitMessageSDL() )
 	{
-		// Update();
-		// Draw();
-		ComputeSilhouettes(sceneObjects);
+		Update();
+		Draw();
 	}
 
 	SDL_SaveBMP( screen, "screenshot.bmp" );
@@ -229,124 +237,70 @@ void Update()
 	}
 }
 
-
-//Debugging functions
-void drawEdge(vector<Pixel> line)
+void CheckCountourList( Edge edge, vector<Edge>& contourList )
 {
-	cout << "Starting drawing" << endl;
-	for( uint i=0; i<line.size(); ++i )
+	if( contourList.size() == 0 )
 	{
-		PutPixelSDL(screen, line[i].x, line[i].y, pink);
-		cout << "Pixel put!" << endl;
+		contourList.push_back(edge);
+		return;
 	}
-	cout << "Finished edge!" << endl;
-}
 
-void DrawSilouhetteEdges(vector<Object> sceneObjects)
-{
-	Vertex vect1, vect2;
-	Pixel p1;
-	Pixel p2;
-	for( uint i=0; i<sceneObjects.size(); ++i )
+	for( uint i=0; i<contourList.size(); ++i)
 	{
-		for( uint j=0; j<sceneObjects[i].silouhette.size(); ++j )
+		if( (contourList[i].v1 == edge.v1 && contourList[i].v2 == edge.v2) ||
+	   	    (contourList[i].v1 == edge.v2 && contourList[i].v2 == edge.v1) )
 		{
-			vect1.position = sceneObjects[i].silouhette[j].v1;
-			vect2.position = sceneObjects[i].silouhette[j].v2;
-
-			VertexShader(vect1, p1);
-			VertexShader(vect2, p2);
-			
-			vec2 _p1 = vec2(p1.x, p1.y);
-			vec2 _p2 = vec2(p2.x, p2.y);
-
-			ivec2 delta = abs(_p1 - _p2);
-			int pixels = max(delta.x, delta.y) + 1;
-			vector<Pixel> result(pixels);
-
-			Interpolate(p1, p2, result);
-			drawEdge(result);
+			contourList.erase(contourList.begin() + i);
 		}
-	}
-	cout << "Finished drawing silouhettes!" << endl;
-}
-//--
-
-
-bool isAdjacent(Triangle triangle1, Triangle triangle2, vector<vec3>& v)
-{
-	int commonVertices = 0;
-
-	if(triangle1.v0 == triangle2.v0 || triangle1.v0 == triangle2.v1 || triangle1.v0 == triangle2.v2)
-	{
-		commonVertices++;
-		v.push_back(triangle1.v0);
-	}
-	if(triangle1.v1 == triangle2.v0 || triangle1.v1 == triangle2.v1 || triangle1.v1 == triangle2.v2)
-	{
-		commonVertices++;
-		v.push_back(triangle1.v1);
-	}
-	if( (triangle1.v2 == triangle2.v0 || triangle1.v2 == triangle2.v1 || triangle1.v2 == triangle2.v2) )
-	{
-		commonVertices++;
-		v.push_back(triangle1.v2);
-	}
-
-	return (commonVertices == 2);
-}
-
-bool isSameTriangle(Triangle triangle1, Triangle triangle2)
-{
-	return (triangle1.v0 == triangle2.v0 && triangle1.v1 == triangle2.v1 && triangle1.v2 == triangle2.v2);
-}
-
-void ComputeAdjacencies( Triangle triangle, vector<Triangle> triangles, Adjacencies& adjacencies )
-{	
-	vector<vec3> v;
-	for( uint i=0; i<triangles.size(); ++i )
-	{
-		if(!isSameTriangle(triangle, triangles[i]))
+		else
 		{
-			if(isAdjacent(triangle, triangles[i], v))
-			{
-				adjacencies.triangles.push_back(triangles[i]);
-				adjacencies.v1.push_back(v[0]);
-				adjacencies.v2.push_back(v[1]);
-			}
+			contourList.push_back(edge);
 		}
 	}
 }
 
-void ComputeSilhouettes( vector<Object>& objects )
+void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
 {
-	Adjacencies adjacencies;
+	vector<Edge> contourList;
+	vector<Edge> triangleEdges;
 
 	for( uint i=0; i<objects.size(); ++i )
 	{
 		for( uint j=0; j<objects[i].triangles.size(); ++j )
 		{
-			ComputeAdjacencies(objects[i].triangles[j], objects[i].triangles, adjacencies);
-			vec3 currentNormal = objects[i].triangles[j].normal;
-			float dir1 = dot(normalize(currentNormal), lightPos);
-			if(dir1 >= 0)
+			vec3 averageTrianglePosition = (objects[i].triangles[j].v0 + objects[i].triangles[j].v1 + objects[i].triangles[j].v2)/vec3(3.f,3.f,3.f); //don't know if this is correct
+			vec3 incidentLightDir = averageTrianglePosition - lightPos;
+			if( dot(incidentLightDir, objects[i].triangles[j].normal) >= 0.0f )
 			{
-				for( uint k=0; k<adjacencies.triangles.size(); ++k )
-				{	
-					vec3 normal = adjacencies.triangles[k].normal;
-					float dir2 = dot(normalize(normal), lightPos);
-					if(dir1 * dir2 < 0)
-					{
-						Edge edge;
-						edge.v1 = adjacencies.v1[k];
-						edge.v2 = adjacencies.v2[k];
-						objects[i].silouhette.push_back(edge);
-					}
-				} 
-				adjacencies.triangles.clear();
-				adjacencies.v1.clear();
-				adjacencies.v2.clear();
-			}
+				Edge edge1, edge2, edge3;
+				//edge 1
+				edge1.v1 = objects[i].triangles[j].v0;
+				edge1.v2 = objects[i].triangles[j].v1;
+				triangleEdges.push_back(edge1);
+				//edge 2
+				edge2.v1 = objects[i].triangles[j].v0;
+				edge2.v2 = objects[i].triangles[j].v2;
+				triangleEdges.push_back(edge2);
+				//edge 3
+				edge3.v1 = objects[i].triangles[j].v1;
+				edge3.v2 = objects[i].triangles[j].v2;
+				triangleEdges.push_back(edge3);
+
+				for( uint k=0; k<triangleEdges.size(); ++k )
+				{
+					CheckCountourList(triangleEdges[k], contourList);
+				}
+
+				for( uint k=0; k<contourList.size(); ++k )
+				{
+					Quad quad;
+					quad.v1 = contourList[k].v1;
+					quad.v2 = contourList[k].v2;
+					quad.v3 = contourList[k].v2 + ExtrdudeMagnitude * (contourList[k].v2 - lightPos);
+					quad.v4 = contourList[k].v1 + ExtrdudeMagnitude * (contourList[k].v1 - lightPos);
+					quads.push_back(quad);
+				}
+			}	
 		}
 	}
 }
@@ -397,13 +351,20 @@ vec3 ComputePixelReflectedLight( const Pixel& p, vec3 currentNormal, vec3 curren
 	return currentReflactance * (D + indirectLightPowerPerArea);
 }
 
+vec3 ComputeAmbientLight( vec3 currentReflactance )
+{
+	return currentReflactance * indirectLightPowerPerArea;
+}
+
 void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentReflactance )
 {
 	int x = p.x;
 	int y = p.y;
-	if( p.zinv > depthBuffer[y][x] )
+
+	if( x < SCREEN_HEIGHT && y < SCREEN_WIDTH && p.zinv > depthBuffer[y][x] )
 	{
 		depthBuffer[y][x] = p.zinv;
+		//vec3 R = ComputeAmbientLight(currentReflactance);
 		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
 		// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance); //direct light
 		PutPixelSDL( screen, x, y, currentColor * R);
@@ -542,8 +503,12 @@ void Draw()
 		for( uint j=0; j<SCREEN_WIDTH; ++j )
 		{
 			depthBuffer[i][j] = 0.0f;
+			stencilBuffer[i][j] = 0.0f;
 		}
 	}
+
+	vector<Quad> quads;
+	ComputeSilhouettes(sceneObjects, quads);
 
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
@@ -558,6 +523,23 @@ void Draw()
 		vec3 currentReflactance = triangles[i].color;
 		
 		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+	}
+
+	for( uint i=0; i<quads.size(); ++i )
+	{
+		vector<Vertex> vertices(3);
+
+		vertices[0].position = quads[i].v1;
+		vertices[1].position = quads[i].v2;
+		vertices[2].position = quads[i].v3;
+		
+		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+
+		vertices[0].position = quads[i].v1;
+		vertices[1].position = quads[i].v2;
+		vertices[2].position = quads[i].v4;
+		
+		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
 	}
 
     if ( SDL_MUSTLOCK(screen) )
