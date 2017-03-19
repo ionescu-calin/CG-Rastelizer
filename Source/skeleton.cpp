@@ -254,12 +254,10 @@ void CheckCountourList( Edge edge, vector<Edge>& contourList )
 			cout << "removed edge" << endl;
 			contourList.erase(contourList.begin() + i);
 		}
-		else
-		{
-			cout << "added edge" << endl;
-			contourList.push_back(edge);
-		}
 	}
+
+		cout << "added edge" << endl;
+		contourList.push_back(edge);
 }
 
 void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
