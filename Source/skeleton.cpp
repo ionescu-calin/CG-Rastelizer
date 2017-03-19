@@ -96,7 +96,7 @@ vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 vec3 lightDirection(1.f, -0.5f, -0.7f);
 
 /*SHADOW VOLUME*/
-vec3 ExtrdudeMagnitude(10.f, 10.f, 10.f);
+vec3 ExtrdudeMagnitude(1.f, 1.f, 1.f);
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -241,6 +241,7 @@ void CheckCountourList( Edge edge, vector<Edge>& contourList )
 {
 	if( contourList.size() == 0 )
 	{
+		//cout << "added first edge" << endl;
 		contourList.push_back(edge);
 		return;
 	}
@@ -250,10 +251,12 @@ void CheckCountourList( Edge edge, vector<Edge>& contourList )
 		if( (contourList[i].v1 == edge.v1 && contourList[i].v2 == edge.v2) ||
 	   	    (contourList[i].v1 == edge.v2 && contourList[i].v2 == edge.v1) )
 		{
+			cout << "removed edge" << endl;
 			contourList.erase(contourList.begin() + i);
 		}
 		else
 		{
+			cout << "added edge" << endl;
 			contourList.push_back(edge);
 		}
 	}
@@ -264,11 +267,16 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
 	vector<Edge> contourList;
 	vector<Edge> triangleEdges;
 
+	//cout << "Starting again: " << endl;
 	for( uint i=0; i<objects.size(); ++i )
 	{
 		for( uint j=0; j<objects[i].triangles.size(); ++j )
 		{
-			vec3 averageTrianglePosition = (objects[i].triangles[j].v0 + objects[i].triangles[j].v1 + objects[i].triangles[j].v2)/vec3(3.f,3.f,3.f); //don't know if this is correct
+			float x = (objects[i].triangles[j].v0.x + objects[i].triangles[j].v1.x + objects[i].triangles[j].v2.x)/3.f;
+			float y = (objects[i].triangles[j].v0.y + objects[i].triangles[j].v1.y + objects[i].triangles[j].v2.y)/3.f;
+			float z = (objects[i].triangles[j].v0.z + objects[i].triangles[j].v1.z + objects[i].triangles[j].v2.z)/3.f;
+
+			vec3 averageTrianglePosition = vec3(x,y,z);//(objects[i].triangles[j].v0 + objects[i].triangles[j].v1 + objects[i].triangles[j].v2)/vec3(3.f,3.f,3.f); //don't know if this is correct
 			vec3 incidentLightDir = averageTrianglePosition - lightPos;
 			if( dot(incidentLightDir, objects[i].triangles[j].normal) >= 0.0f )
 			{
@@ -289,20 +297,24 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
 				for( uint k=0; k<triangleEdges.size(); ++k )
 				{
 					CheckCountourList(triangleEdges[k], contourList);
-				}
-
-				for( uint k=0; k<contourList.size(); ++k )
-				{
-					Quad quad;
-					quad.v1 = contourList[k].v1;
-					quad.v2 = contourList[k].v2;
-					quad.v3 = contourList[k].v2 + ExtrdudeMagnitude * (contourList[k].v2 - lightPos);
-					quad.v4 = contourList[k].v1 + ExtrdudeMagnitude * (contourList[k].v1 - lightPos);
-					quads.push_back(quad);
-				}
-			}	
+				}			
+			}
+			triangleEdges.clear();	
 		}
 	}
+
+	cout << contourList.size() << endl;
+
+	for( uint k=0; k<contourList.size(); ++k )
+	{
+		Quad quad;
+		quad.v1 = contourList[k].v1;
+		quad.v2 = contourList[k].v2;
+		quad.v3 = contourList[k].v1 + ExtrdudeMagnitude * (contourList[k].v1 - lightPos);
+		quad.v4 = contourList[k].v2 + ExtrdudeMagnitude * (contourList[k].v2 - lightPos);
+		quads.push_back(quad);
+	}
+	//cout << "end" << endl;
 }
 
 void VertexShader( const Vertex& v, Pixel& p ) 
@@ -532,10 +544,19 @@ void Draw()
 		vertices[0].position = quads[i].v1;
 		vertices[1].position = quads[i].v2;
 		vertices[2].position = quads[i].v3;
+
+		// Pixel p1, p2, p3, p4;
+
+		// VertexShader(vertices[0], p1);
+		// VertexShader(vertices[1], p2);
+		// // VertexShader(vertices[2], p3);
+		// // VertexShader(vertices[3], p4);
+
+		// DrawLineSDL( screen, p1, p2, pink,  vec3(0.0f,0.0f,0.0f), pink );
 		
 		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
 
-		vertices[0].position = quads[i].v1;
+		vertices[0].position = quads[i].v3;
 		vertices[1].position = quads[i].v2;
 		vertices[2].position = quads[i].v4;
 		
