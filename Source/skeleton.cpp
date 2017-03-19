@@ -246,18 +246,22 @@ void CheckCountourList( Edge edge, vector<Edge>& contourList )
 		return;
 	}
 
+	int found = 0;
 	for( uint i=0; i<contourList.size(); ++i)
 	{
 		if( (contourList[i].v1 == edge.v1 && contourList[i].v2 == edge.v2) ||
 	   	    (contourList[i].v1 == edge.v2 && contourList[i].v2 == edge.v1) )
 		{
+			found = 1;
 			cout << "removed edge" << endl;
 			contourList.erase(contourList.begin() + i);
 		}
 	}
-
+	
+	if(!found) {
 		cout << "added edge" << endl;
 		contourList.push_back(edge);
+	}
 }
 
 void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
