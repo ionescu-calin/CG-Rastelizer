@@ -55,6 +55,15 @@ struct Vertex
 	vec3 position;
 };
 
+
+//Clipping Bounds:
+float minX = -1.0f;
+float minY = -1.0f;
+float minZ = 0.0f;
+float maxX = 1.0f;
+float maxY = 1.0f;
+float maxZ = 1.0f;
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
@@ -87,6 +96,18 @@ int main( int argc, char* argv[] )
 	return 0;
 }
 
+
+void SetCulling() {
+	for( size_t i = 0; i < triangles.size(); ++i )
+	{
+		triangles[i].culled = false;
+		// Backface culling
+		if (glm::dot((triangles[i].v0-cameraPos),triangles[i].normal)>0.0f)
+		{
+			triangles[i].culled = true;
+		}
+	}
+}
 void Update()
 {
 	// Compute frame time:
@@ -102,6 +123,7 @@ void Update()
 	vec3 down(cameraR[1][0], cameraR[1][1], cameraR[1][2]);
 	vec3 forward(cameraR[2][0], cameraR[2][1], cameraR[2][2]);
 
+	SetCulling();
 	//Control camera
     if( keystate[SDLK_UP] )
     {
@@ -365,6 +387,8 @@ void Draw()
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
+		if(triangles[i].culled) 
+			continue;
 		vector<Vertex> vertices(3);
 
 		vertices[0].position = triangles[i].v0;
