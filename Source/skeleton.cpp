@@ -10,8 +10,8 @@ using glm::vec3;
 using glm::mat3;
 using glm::ivec2;
 
-#define RotationSpeed 0.05f	//Camera rotation speed
-#define MoveSpeed 0.05f
+#define RotationSpeed 0.01f	//Camera rotation speed
+#define MoveSpeed 0.01f
 #define LightMoveSpeed 0.01f
 
 /* ----------------------------------------------------------------------------*/
@@ -72,8 +72,15 @@ public:
 const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
 SDL_Surface* screen;
+
+/*BUFFERS*/
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
-int stencilBuffer[SCREEN_WIDTH][SCREEN_HEIGHT];
+int stencilBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+vec3 frameBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+//int frameBuffering = 1;
+int depthBuffering = 1;
+int stencilBuffering = 0;
+
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
@@ -241,7 +248,6 @@ void CheckCountourList( Edge edge, vector<Edge>& contourList )
 {
 	if( contourList.size() == 0 )
 	{
-		//cout << "added first edge" << endl;
 		contourList.push_back(edge);
 		return;
 	}
@@ -253,23 +259,20 @@ void CheckCountourList( Edge edge, vector<Edge>& contourList )
 	   	    (contourList[i].v1 == edge.v2 && contourList[i].v2 == edge.v1) )
 		{
 			found = 1;
-			cout << "removed edge" << endl;
 			contourList.erase(contourList.begin() + i);
 		}
 	}
 	
 	if(!found) {
-		cout << "added edge" << endl;
 		contourList.push_back(edge);
 	}
 }
 
-void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
+void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads, vector<Triangle>& caps)
 {
 	vector<Edge> contourList;
 	vector<Edge> triangleEdges;
 
-	//cout << "Starting again: " << endl;
 	for( uint i=0; i<objects.size(); ++i )
 	{
 		for( uint j=0; j<objects[i].triangles.size(); ++j )
@@ -300,12 +303,18 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
 				{
 					CheckCountourList(triangleEdges[k], contourList);
 				}			
+				caps.push_back(objects[i].triangles[j]);
+
+				vec3 extrudedv0, extrudedv1, extrudedv2;
+				extrudedv0 = objects[i].triangles[j].v0 + ExtrdudeMagnitude * (objects[i].triangles[j].v0 - lightPos);
+				extrudedv1 = objects[i].triangles[j].v1 + ExtrdudeMagnitude * (objects[i].triangles[j].v1 - lightPos);	
+				extrudedv2 = objects[i].triangles[j].v2 + ExtrdudeMagnitude * (objects[i].triangles[j].v2 - lightPos);	
+
+				caps.push_back(Triangle(extrudedv0, extrudedv1, extrudedv2, objects[i].triangles[j].color));	
 			}
 			triangleEdges.clear();	
 		}
 	}
-
-	cout << contourList.size() << endl;
 
 	for( uint k=0; k<contourList.size(); ++k )
 	{
@@ -316,7 +325,6 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads )
 		quad.v4 = contourList[k].v2 + ExtrdudeMagnitude * (contourList[k].v2 - lightPos);
 		quads.push_back(quad);
 	}
-	//cout << "end" << endl;
 }
 
 void VertexShader( const Vertex& v, Pixel& p ) 
@@ -375,14 +383,44 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 	int x = p.x;
 	int y = p.y;
 
-	if( x < SCREEN_HEIGHT && y < SCREEN_WIDTH && p.zinv > depthBuffer[y][x] )
+	if( x < SCREEN_HEIGHT && y < SCREEN_WIDTH )
 	{
-		depthBuffer[y][x] = p.zinv;
-		//vec3 R = ComputeAmbientLight(currentReflactance);
-		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-		// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance); //direct light
-		PutPixelSDL( screen, x, y, currentColor * R);
+		if( depthBuffering == 1 )
+		{
+			if( stencilBuffering == 1 )
+			{
+				if( p.zinv > depthBuffer[y][x] && stencilBuffer[y][x] == 0.f )
+				{
+					depthBuffer[y][x] = p.zinv;
+					vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+					currentColor = currentColor * R; //+ frameBuffer[y][x]);
+					frameBuffer[y][x] = currentColor;
+					PutPixelSDL( screen, x, y, frameBuffer[y][x] );
+				}
+			}
+			else 
+			{
+				if( p.zinv > depthBuffer[y][x] )
+				{
+					depthBuffer[y][x] = p.zinv;
+					vec3 R = ComputeAmbientLight(currentReflactance);
+					frameBuffer[y][x] = R;
+				}
+			}
+		}
+		else
+		{
+			if( p.zinv > depthBuffer[y][x] )
+			{
+				stencilBuffer[y][x]++;
+				frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
+			}
+		}
 	}
+
+	//vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+	// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance); //direct light
+	//PutPixelSDL( screen, x, y, currentColor * R);
 }
 
 void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
@@ -522,8 +560,10 @@ void Draw()
 	}
 
 	vector<Quad> quads;
-	ComputeSilhouettes(sceneObjects, quads);
+	vector<Triangle> caps;
+	ComputeSilhouettes(sceneObjects, quads, caps);
 
+	stencilBuffering = 0;
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
@@ -538,8 +578,10 @@ void Draw()
 		
 		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
+	
+	depthBuffering = 0;
 
-	for( uint i=0; i<quads.size(); ++i )
+	for( uint i=0; i<quads.size(); ++i)
 	{
 		vector<Vertex> vertices(3);
 
@@ -547,23 +589,115 @@ void Draw()
 		vertices[1].position = quads[i].v2;
 		vertices[2].position = quads[i].v3;
 
-		// Pixel p1, p2, p3, p4;
-
-		// VertexShader(vertices[0], p1);
-		// VertexShader(vertices[1], p2);
-		// // VertexShader(vertices[2], p3);
-		// // VertexShader(vertices[3], p4);
-
-		// DrawLineSDL( screen, p1, p2, pink,  vec3(0.0f,0.0f,0.0f), pink );
-		
 		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
 
 		vertices[0].position = quads[i].v3;
 		vertices[1].position = quads[i].v2;
 		vertices[2].position = quads[i].v4;
-		
+
 		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
 	}
+
+	for( uint i=0; i<caps.size(); ++i)
+	{
+		vector<Vertex> vertices(3);
+
+		vertices[0].position = caps[i].v0;
+		vertices[1].position = caps[i].v1;
+		vertices[2].position = caps[i].v2;
+
+		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+	}
+
+	stencilBuffering = 1;
+	depthBuffering = 1;
+
+	for( uint i=0; i<SCREEN_HEIGHT; ++i )
+	{
+		for( uint j=0; j<SCREEN_WIDTH; ++j )
+		{
+			depthBuffer[i][j] = 0.0f;
+		}
+	}
+
+	for( uint i=0; i<triangles.size(); ++i )
+	{
+		vector<Vertex> vertices(3);
+
+		vertices[0].position = triangles[i].v0;
+		vertices[1].position = triangles[i].v1;
+		vertices[2].position = triangles[i].v2;
+
+		vec3 currentNormal = triangles[i].normal;
+		vec3 currentReflactance = triangles[i].color;
+		
+		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+	}
+
+	// for( uint i=0; i<SCREEN_HEIGHT; ++i )
+	// {
+	// 	for( uint j=0; j<SCREEN_WIDTH; ++j )
+	// 	{
+	// 		depthBuffer[i][j] = 0.0f;
+	// 		stencilBuffer[i][j] = 0.0f;
+	// 		frameBuffer[i][j] = vec3(0.0f,0.0f,0.0f)	;
+	// 	}
+	// }
+
+		// for( uint i=0; i<quads.size(); ++i)
+		// {
+		// 	vertices[0].position = quads[i].v1;
+		// 	vertices[1].position = quads[i].v2;
+		// 	vertices[2].position = quads[i].v3;
+
+		// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+
+		// 	vertices[0].position = quads[i].v3;
+		// 	vertices[1].position = quads[i].v2;
+		// 	vertices[2].position = quads[i].v4;
+
+		// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+
+		// }
+
+	// for( uint i=0; i<quads.size(); ++i )
+	// {
+	// 	vector<Vertex> vertices(3);
+
+	// 	vertices[0].position = quads[i].v1;
+	// 	vertices[1].position = quads[i].v2;
+	// 	vertices[2].position = quads[i].v3;
+
+	// 	Pixel p1, p2, p3, p4;
+
+	// 	VertexShader(vertices[0], p1);
+	// 	VertexShader(vertices[1], p2);
+	// 	// VertexShader(vertices[2], p3);
+	// 	// VertexShader(vertices[3], p4);
+
+	// 	DrawLineSDL( screen, p1, p2, pink,  vec3(0.0f,0.0f,0.0f), pink );
+		
+	// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+
+	// 	vertices[0].position = quads[i].v3;
+	// 	vertices[1].position = quads[i].v2;
+	// 	vertices[2].position = quads[i].v4;
+		
+	// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+	// }
+
+	// cout << caps.size() << endl;
+
+	// for( uint i=0; i<caps.size(); ++i )
+	// {
+	// 	vector<Vertex> vertices(3);
+
+	// 	vertices[0].position = caps[i].v0;
+	// 	vertices[1].position = caps[i].v1;
+	// 	vertices[2].position = caps[i].v2;
+
+	// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+	// }
 
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
