@@ -35,6 +35,7 @@ struct Edge
 {
 	vec3 v1;
 	vec3 v2;
+	vec3 normal;
 };
 
 struct Adjacencies
@@ -50,6 +51,7 @@ struct Quad
 	vec3 v2;
 	vec3 v3;
 	vec3 v4;
+	vec3 normal;
 };
 
 /*CLASSES*/
@@ -80,6 +82,8 @@ vec3 frameBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 //int frameBuffering = 1;
 int depthBuffering = 1;
 int stencilBuffering = 0;
+int renderFrontFaces = 0;
+int renderBackFaces = 0;
 
 int t;
 mat3 cameraR;
@@ -122,9 +126,11 @@ vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 curr
 vec3 ComputeAmbientLight( vec3 currentReflactance );
 void ComputeSilhouettes( vector<Object>& objects );
 void ComputeShadowQuads( vector<Object> objects );
-//Debugging functions
-void DrawSilhouetteEdges(vector<Object> sceneObjects);
-
+void RenderTriangles(vector<Triangle> triangles);
+void RederQuad(Quad quad);
+void RenderQuads(vector<Quad> quads);
+void RenderCaps(vector<Triangle> caps);
+void RenderCap(Triangle cap);
 
 int main( int argc, char* argv[] )
 {
@@ -237,10 +243,6 @@ void Update()
 	if( keystate[SDLK_z] ) {
 		lightPos.z -= LightMoveSpeed;	//Down
 		lightDirection.z -= LightMoveSpeed;
-		cout << lightPos.x << "\n";
-		cout << lightPos.y << "\n";
-		cout << lightPos.z << "\n";
-
 	}
 }
 
@@ -289,14 +291,17 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads, vector<Tr
 				//edge 1
 				edge1.v1 = objects[i].triangles[j].v0;
 				edge1.v2 = objects[i].triangles[j].v1;
+				edge1.normal = objects[i].triangles[j].normal;
 				triangleEdges.push_back(edge1);
 				//edge 2
 				edge2.v1 = objects[i].triangles[j].v0;
 				edge2.v2 = objects[i].triangles[j].v2;
+				edge2.normal = objects[i].triangles[j].normal;
 				triangleEdges.push_back(edge2);
 				//edge 3
 				edge3.v1 = objects[i].triangles[j].v1;
 				edge3.v2 = objects[i].triangles[j].v2;
+				edge3.normal = objects[i].triangles[j].normal;
 				triangleEdges.push_back(edge3);
 
 				for( uint k=0; k<triangleEdges.size(); ++k )
@@ -306,6 +311,7 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads, vector<Tr
 				caps.push_back(objects[i].triangles[j]);
 
 				vec3 extrudedv0, extrudedv1, extrudedv2;
+				
 				extrudedv0 = objects[i].triangles[j].v0 + ExtrdudeMagnitude * (objects[i].triangles[j].v0 - lightPos);
 				extrudedv1 = objects[i].triangles[j].v1 + ExtrdudeMagnitude * (objects[i].triangles[j].v1 - lightPos);	
 				extrudedv2 = objects[i].triangles[j].v2 + ExtrdudeMagnitude * (objects[i].triangles[j].v2 - lightPos);	
@@ -323,6 +329,7 @@ void ComputeSilhouettes( vector<Object>& objects, vector<Quad>& quads, vector<Tr
 		quad.v2 = contourList[k].v2;
 		quad.v3 = contourList[k].v1 + ExtrdudeMagnitude * (contourList[k].v1 - lightPos);
 		quad.v4 = contourList[k].v2 + ExtrdudeMagnitude * (contourList[k].v2 - lightPos);
+		quad.normal = contourList[k].normal;
 		quads.push_back(quad);
 	}
 }
@@ -389,13 +396,12 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 		{
 			if( stencilBuffering == 1 )
 			{
-				if( p.zinv > depthBuffer[y][x] && stencilBuffer[y][x] == 0.f )
+				if( p.zinv > depthBuffer[y][x] )
 				{
 					depthBuffer[y][x] = p.zinv;
 					vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-					currentColor = currentColor * R; //+ frameBuffer[y][x]);
-					frameBuffer[y][x] = currentColor;
-					PutPixelSDL( screen, x, y, frameBuffer[y][x] );
+					currentColor = currentColor * (R + frameBuffer[y][x]);
+					PutPixelSDL( screen, x, y, currentColor );
 				}
 			}
 			else 
@@ -404,7 +410,7 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 				{
 					depthBuffer[y][x] = p.zinv;
 					vec3 R = ComputeAmbientLight(currentReflactance);
-					frameBuffer[y][x] = R;
+					frameBuffer[y][x] = R * currentColor;
 				}
 			}
 		}
@@ -412,15 +418,19 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 		{
 			if( p.zinv > depthBuffer[y][x] )
 			{
-				stencilBuffer[y][x]++;
-				frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
+				if(renderFrontFaces)
+				{
+					stencilBuffer[y][x]++;
+					frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
+				}
+				else 
+				{
+					stencilBuffer[y][x]--;
+					frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
+				}
 			}
 		}
 	}
-
-	//vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-	// vec3 R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance); //direct light
-	//PutPixelSDL( screen, x, y, currentColor * R);
 }
 
 void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
@@ -544,12 +554,106 @@ void DrawPolygon( const vector<Vertex>& vertices, vec3 color, vec3 currentNormal
 	DrawRows( leftPixels, rightPixels, color, currentNormal, currentReflactance);
 }
 
+void RenderTriangles(vector<Triangle> triangles)
+{
+	//#pragma omp parallel for
+	for( uint i=0; i<triangles.size(); ++i )
+	{
+		vector<Vertex> vertices(3);
+
+		vertices[0].position = triangles[i].v0;
+		vertices[1].position = triangles[i].v1;
+		vertices[2].position = triangles[i].v2;
+
+		vec3 currentNormal = triangles[i].normal;
+		vec3 currentReflactance = triangles[i].color;
+		
+		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+	}
+}
+
+void RenderQuad(Quad quad)
+{
+	vector<Vertex> vertices(3);
+
+	vertices[0].position = quad.v1;
+	vertices[1].position = quad.v2;
+	vertices[2].position = quad.v3;
+
+	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+
+	vertices[0].position = quad.v3;
+	vertices[1].position = quad.v2;
+	vertices[2].position = quad.v4;
+
+	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+}
+
+void RenderQuads(vector<Quad> quads)
+{
+	#pragma omp parallel for
+	for( uint i=0; i<quads.size(); ++i)
+	{
+		if(renderFrontFaces)
+		{
+			if(dot(quads[i].normal, lightPos) >= 0.0f)
+			{
+				RenderQuad(quads[i]);
+			}
+		}
+		else
+		{
+			if(dot(quads[i].normal, lightPos) < 0.0f)
+			{
+				RenderQuad(quads[i]);
+			}
+
+		}
+	}
+}
+
+void RenderCap(Triangle cap)
+{
+	vector<Vertex> vertices(3);
+
+	vertices[0].position = cap.v0;
+	vertices[1].position = cap.v1;
+	vertices[2].position = cap.v2;
+
+	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
+}
+
+void RenderCaps(vector<Triangle> caps)
+{
+	#pragma omp parallel for
+	for( uint i=0; i<caps.size(); ++i)
+	{
+		if(renderFrontFaces)
+		{
+			if(dot(caps[i].normal, lightPos) >= 0.0f)
+			{
+				RenderCap(caps[i]);
+			}
+		}
+		else
+		{
+			if(dot(caps[i].normal, lightPos) < 0.0f)
+			{
+				RenderCap(caps[i]);
+			}
+
+		}
+	}
+}
+
 void Draw() 
 {
 	SDL_FillRect( screen, 0, 0 );
 	if( SDL_MUSTLOCK(screen) )
 		SDL_LockSurface(screen);
 
+	// Initialise depth and stencil buffers
+	#pragma omp parallel for
 	for( uint i=0; i<SCREEN_HEIGHT; ++i )
 	{
 		for( uint j=0; j<SCREEN_WIDTH; ++j )
@@ -563,55 +667,29 @@ void Draw()
 	vector<Triangle> caps;
 	ComputeSilhouettes(sceneObjects, quads, caps);
 
+	// Disable writing to stencil buffer
 	stencilBuffering = 0;
-	// #pragma omp parallel for
-	for( uint i=0; i<triangles.size(); ++i )
-	{
-		vector<Vertex> vertices(3);
+	RenderTriangles(triangles);
 
-		vertices[0].position = triangles[i].v0;
-		vertices[1].position = triangles[i].v1;
-		vertices[2].position = triangles[i].v2;
-
-		vec3 currentNormal = triangles[i].normal;
-		vec3 currentReflactance = triangles[i].color;
-		
-		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
-	}
-	
+	// Disable writing to depth buffer
 	depthBuffering = 0;
 
-	for( uint i=0; i<quads.size(); ++i)
-	{
-		vector<Vertex> vertices(3);
+	// Draw front faces
+	renderFrontFaces = 1;
+	RenderQuads(quads);
+	RenderCaps(caps);
 
-		vertices[0].position = quads[i].v1;
-		vertices[1].position = quads[i].v2;
-		vertices[2].position = quads[i].v3;
+	// Draw back faces
+	renderFrontFaces = 0;
+	RenderQuads(quads);
+	RenderCaps(caps);
 
-		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-
-		vertices[0].position = quads[i].v3;
-		vertices[1].position = quads[i].v2;
-		vertices[2].position = quads[i].v4;
-
-		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-	}
-
-	for( uint i=0; i<caps.size(); ++i)
-	{
-		vector<Vertex> vertices(3);
-
-		vertices[0].position = caps[i].v0;
-		vertices[1].position = caps[i].v1;
-		vertices[2].position = caps[i].v2;
-
-		DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-	}
-
+	// Enable stencil and buffer testing
 	stencilBuffering = 1;
 	depthBuffering = 1;
-
+	
+	// Clear depth buffer
+	#pragma omp parallel for
 	for( uint i=0; i<SCREEN_HEIGHT; ++i )
 	{
 		for( uint j=0; j<SCREEN_WIDTH; ++j )
@@ -620,84 +698,8 @@ void Draw()
 		}
 	}
 
-	for( uint i=0; i<triangles.size(); ++i )
-	{
-		vector<Vertex> vertices(3);
-
-		vertices[0].position = triangles[i].v0;
-		vertices[1].position = triangles[i].v1;
-		vertices[2].position = triangles[i].v2;
-
-		vec3 currentNormal = triangles[i].normal;
-		vec3 currentReflactance = triangles[i].color;
-		
-		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
-	}
-
-	// for( uint i=0; i<SCREEN_HEIGHT; ++i )
-	// {
-	// 	for( uint j=0; j<SCREEN_WIDTH; ++j )
-	// 	{
-	// 		depthBuffer[i][j] = 0.0f;
-	// 		stencilBuffer[i][j] = 0.0f;
-	// 		frameBuffer[i][j] = vec3(0.0f,0.0f,0.0f)	;
-	// 	}
-	// }
-
-		// for( uint i=0; i<quads.size(); ++i)
-		// {
-		// 	vertices[0].position = quads[i].v1;
-		// 	vertices[1].position = quads[i].v2;
-		// 	vertices[2].position = quads[i].v3;
-
-		// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-
-		// 	vertices[0].position = quads[i].v3;
-		// 	vertices[1].position = quads[i].v2;
-		// 	vertices[2].position = quads[i].v4;
-
-		// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-
-		// }
-
-	// for( uint i=0; i<quads.size(); ++i )
-	// {
-	// 	vector<Vertex> vertices(3);
-
-	// 	vertices[0].position = quads[i].v1;
-	// 	vertices[1].position = quads[i].v2;
-	// 	vertices[2].position = quads[i].v3;
-
-	// 	Pixel p1, p2, p3, p4;
-
-	// 	VertexShader(vertices[0], p1);
-	// 	VertexShader(vertices[1], p2);
-	// 	// VertexShader(vertices[2], p3);
-	// 	// VertexShader(vertices[3], p4);
-
-	// 	DrawLineSDL( screen, p1, p2, pink,  vec3(0.0f,0.0f,0.0f), pink );
-		
-	// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-
-	// 	vertices[0].position = quads[i].v3;
-	// 	vertices[1].position = quads[i].v2;
-	// 	vertices[2].position = quads[i].v4;
-		
-	// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-	// }
-
-	// cout << caps.size() << endl;
-
-	// for( uint i=0; i<caps.size(); ++i )
-	// {
-	// 	vector<Vertex> vertices(3);
-
-	// 	vertices[0].position = caps[i].v0;
-	// 	vertices[1].position = caps[i].v1;
-	// 	vertices[2].position = caps[i].v2;
-
-	// 	DrawPolygon(vertices, pink, vec3(0.0f,0.0f,0.0f), pink);
-	// }
+	// Render scene preforming depth and stencil test
+	RenderTriangles(triangles);
 
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
