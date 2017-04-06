@@ -135,22 +135,22 @@ void SetCullingAndClipping() {
 			vec3 v1 = triangles[i].v1;
 			vec3 v2 = triangles[i].v2;
 
+			// Go to view space
 			v0 = (v0-cameraPos)*cameraR;
 			v1 = (v1-cameraPos)*cameraR;
 			v2 = (v2-cameraPos)*cameraR;
-			// Map to clipping space
+			
+			// Map to clipping space (Hopefully this is right)
+			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, v0.z/f);
+			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, v1.z/f);
+			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, v2.z/f);
 
-			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
-			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
-			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
-
+			//TODO: actual clipping that sets the triangle as clipped or not
 			bool bv0 = InCuboid(tv0);
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
-
-			// Determine culling
-			if (!bv0 && !bv1 && !bv2)
-				triangles[i].isCulled = true;
+			//TODO: this can probably be integrated with the vertex shader so the transforms are not done twice.
+			
 	}
 }
 
