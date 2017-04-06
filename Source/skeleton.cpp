@@ -97,7 +97,30 @@ int main( int argc, char* argv[] )
 }
 
 
-void SetCulling() {
+void SetCullingAndClipping() {
+
+
+	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraRot);
+	float near = cameraPos.z+fVec.z*0.1f, far = cameraPos.z+fVec.z*15.0f;
+	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
+
+	// Perspective matrix transformation
+	mat4 transform = glm::mat4(0.0f);
+	// fovy version
+	vec3 t(0.0f, -h/2.0f, focalLength);
+	vec3 b(0.0f, h/2.0f, focalLength);
+	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
+	float rfovy = acos(cy);
+	float fovy = (180.0f/M_PI)*rfovy;
+	float aspect = w/h;
+	transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
+	transform[1][1] = (1.0f/tan(rfovy/2.0f));
+	transform[2][2] = far/(far-near);
+	transform[3][2] = near*far/(far-near);
+	transform[3][2] = 1.0f;
+
+
+
 	for( size_t i = 0; i < triangles.size(); ++i )
 	{
 		triangles[i].culled = false;
@@ -106,8 +129,41 @@ void SetCulling() {
 		{
 			triangles[i].culled = true;
 		}
+
+		if(triangles[i].culled == false) {
+			vec3 v0 = triangles[i].v0;
+			vec3 v1 = triangles[i].v1;
+			vec3 v2 = triangles[i].v2;
+
+			v0 = (v0-cameraPos)*cameraR;
+			v1 = (v1-cameraPos)*cameraR;
+			v2 = (v2-cameraPos)*cameraR;
+			// Map to clipping space
+
+			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
+			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
+			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
+
+			bool bv0 = InCuboid(tv0);
+			bool bv1 = InCuboid(tv1);
+			bool bv2 = InCuboid(tv2);
+
+			// Determine culling
+			if (!bv0 && !bv1 && !bv2)
+				triangles[i].isCulled = true;
 	}
 }
+
+bool InCuboid(glm::vec4 v)
+{
+	if (v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY && v.z >= minZ && v.z <= maxZ)
+	{
+		return true;
+	}
+	return false;
+}
+
+
 void Update()
 {
 	// Compute frame time:
@@ -425,7 +481,7 @@ const int RIGHT = 2;  // 0010
 const int BOTTOM = 4; // 0100
 const int TOP = 8;    // 1000
 
-OutCode ComputeOutCode(double x, double y)
+OutCode ComputeOutCode(float x, float y)
 {
 	OutCode code;
 
@@ -443,8 +499,8 @@ OutCode ComputeOutCode(double x, double y)
 	return code;
 }
 
-
-void CohenSutherlandLineClipAndDraw(double x0, double y0, double x1, double y1)
+// TODO: Make it return a list of new vertices
+void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
 {
 	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
 	OutCode outcode0 = ComputeOutCode(x0, y0);
@@ -460,7 +516,7 @@ void CohenSutherlandLineClipAndDraw(double x0, double y0, double x1, double y1)
 		} else {
 			// failed both tests, so calculate the line segment to clip
 			// from an outside point to an intersection with clip edge
-			double x, y;
+			float x, y;
 
 			// At least one endpoint is outside the clip rectangle; pick it.
 			OutCode outcodeOut = outcode0 ? outcode0 : outcode1;
@@ -501,3 +557,5 @@ void CohenSutherlandLineClipAndDraw(double x0, double y0, double x1, double y1)
 		LineSegment(x0, y0, x1, y1);
 	}
 }
+
+//TODO: Write function that takes the new points and creates triangles:
