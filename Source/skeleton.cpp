@@ -9,6 +9,8 @@ using glm::vec2;
 using glm::vec3;
 using glm::mat3;
 using glm::ivec2;
+using glm::vec4;
+using glm::mat4;
 
 #define RotationSpeed 0.05f	//Camera rotation speed
 #define MoveSpeed 0.05f
@@ -25,7 +27,7 @@ float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
-float f = 1.0f;
+float f = 1.9f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
@@ -59,7 +61,7 @@ struct Vertex
 //Clipping Bounds:
 float minX = -1.0f;
 float minY = -1.0f;
-float minZ = 0.0f;
+float minZ = -1.0f;
 float maxX = 1.0f;
 float maxY = 1.0f;
 float maxZ = 1.0f;
@@ -97,18 +99,29 @@ int main( int argc, char* argv[] )
 }
 
 
+
+bool InCuboid(glm::vec4 v)
+{
+	// cout<<v.x<< " "<< v.y<< " "<< v.z <<endl;
+	if (v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY && v.z >= minZ && v.z <= maxZ)
+	{
+		return true;
+	}
+	return false;
+}
+
 void SetCullingAndClipping() {
 
-
-	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraRot);
+    float f = 800.0f;
+	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
 	float near = cameraPos.z+fVec.z*0.1f, far = cameraPos.z+fVec.z*15.0f;
 	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
 
 	// Perspective matrix transformation
 	mat4 transform = glm::mat4(0.0f);
 	// fovy version
-	vec3 t(0.0f, -h/2.0f, focalLength);
-	vec3 b(0.0f, h/2.0f, focalLength);
+	vec3 t(0.0f, -h/2.0f, f);
+	vec3 b(0.0f, h/2.0f, f);
 	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
 	float rfovy = acos(cy);
 	float fovy = (180.0f/M_PI)*rfovy;
@@ -141,26 +154,30 @@ void SetCullingAndClipping() {
 			v2 = (v2-cameraPos)*cameraR;
 			
 			// Map to clipping space (Hopefully this is right)
-			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, v0.z/f);
-			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, v1.z/f);
-			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, v2.z/f);
+			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
+			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
+			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
+			tv0 = tv0*transform;
+			tv1 = tv1*transform;
+			tv2 = tv2*transform;
 
-			//TODO: actual clipping that sets the triangle as clipped or not
+			tv0 = tv0/tv0[3];
+			tv1 = tv1/tv1[3];
+			tv2 = tv2/tv2[3];
+
 			bool bv0 = InCuboid(tv0);
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
 			//TODO: this can probably be integrated with the vertex shader so the transforms are not done twice.
-			
-	}
-}
 
-bool InCuboid(glm::vec4 v)
-{
-	if (v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY && v.z >= minZ && v.z <= maxZ)
-	{
-		return true;
+			// cout<<bv0<<bv1<<bv2<<endl;
+			// Determine culling (useless)
+			if (!bv0 && !bv1 && !bv2) {
+				triangles[i].culled = true;
+			}
+			
+		}
 	}
-	return false;
 }
 
 
@@ -179,7 +196,7 @@ void Update()
 	vec3 down(cameraR[1][0], cameraR[1][1], cameraR[1][2]);
 	vec3 forward(cameraR[2][0], cameraR[2][1], cameraR[2][2]);
 
-	SetCulling();
+	SetCullingAndClipping();
 	//Control camera
     if( keystate[SDLK_UP] )
     {
@@ -499,63 +516,63 @@ OutCode ComputeOutCode(float x, float y)
 	return code;
 }
 
-// TODO: Make it return a list of new vertices
-void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
-{
-	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
-	OutCode outcode0 = ComputeOutCode(x0, y0);
-	OutCode outcode1 = ComputeOutCode(x1, y1);
-	bool accept = false;
+// // TODO: Make it return a list of new vertices
+// void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
+// {
+// 	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
+// 	OutCode outcode0 = ComputeOutCode(x0, y0);
+// 	OutCode outcode1 = ComputeOutCode(x1, y1);
+// 	bool accept = false;
 
-	while (true) {
-		if (!(outcode0 | outcode1)) { // Bitwise OR is 0. Trivially accept and get out of loop
-			accept = true;
-			break;
-		} else if (outcode0 & outcode1) { // Bitwise AND is not 0. (implies both end points are in the same region outside the window). Reject and get out of loop
-			break;
-		} else {
-			// failed both tests, so calculate the line segment to clip
-			// from an outside point to an intersection with clip edge
-			float x, y;
+// 	while (true) {
+// 		if (!(outcode0 | outcode1)) { // Bitwise OR is 0. Trivially accept and get out of loop
+// 			accept = true;
+// 			break;
+// 		} else if (outcode0 & outcode1) { // Bitwise AND is not 0. (implies both end points are in the same region outside the window). Reject and get out of loop
+// 			break;
+// 		} else {
+// 			// failed both tests, so calculate the line segment to clip
+// 			// from an outside point to an intersection with clip edge
+// 			float x, y;
 
-			// At least one endpoint is outside the clip rectangle; pick it.
-			OutCode outcodeOut = outcode0 ? outcode0 : outcode1;
+// 			// At least one endpoint is outside the clip rectangle; pick it.
+// 			OutCode outcodeOut = outcode0 ? outcode0 : outcode1;
 
-			// Now find the intersection point;
-			// use formulas y = y0 + slope * (x - x0), x = x0 + (1 / slope) * (y - y0)
-			if (outcodeOut & TOP) {           // point is above the clip rectangle
-				x = x0 + (x1 - x0) * (ymax - y0) / (y1 - y0);
-				y = ymax;
-			} else if (outcodeOut & BOTTOM) { // point is below the clip rectangle
-				x = x0 + (x1 - x0) * (ymin - y0) / (y1 - y0);
-				y = ymin;
-			} else if (outcodeOut & RIGHT) {  // point is to the right of clip rectangle
-				y = y0 + (y1 - y0) * (xmax - x0) / (x1 - x0);
-				x = xmax;
-			} else if (outcodeOut & LEFT) {   // point is to the left of clip rectangle
-				y = y0 + (y1 - y0) * (xmin - x0) / (x1 - x0);
-				x = xmin;
-			}
+// 			// Now find the intersection point;
+// 			// use formulas y = y0 + slope * (x - x0), x = x0 + (1 / slope) * (y - y0)
+// 			if (outcodeOut & TOP) {           // point is above the clip rectangle
+// 				x = x0 + (x1 - x0) * (ymax - y0) / (y1 - y0);
+// 				y = ymax;
+// 			} else if (outcodeOut & BOTTOM) { // point is below the clip rectangle
+// 				x = x0 + (x1 - x0) * (ymin - y0) / (y1 - y0);
+// 				y = ymin;
+// 			} else if (outcodeOut & RIGHT) {  // point is to the right of clip rectangle
+// 				y = y0 + (y1 - y0) * (xmax - x0) / (x1 - x0);
+// 				x = xmax;
+// 			} else if (outcodeOut & LEFT) {   // point is to the left of clip rectangle
+// 				y = y0 + (y1 - y0) * (xmin - x0) / (x1 - x0);
+// 				x = xmin;
+// 			}
 
-			// Now we move outside point to intersection point to clip
-			// and get ready for next pass.
-			if (outcodeOut == outcode0) {
-				x0 = x;
-				y0 = y;
-				outcode0 = ComputeOutCode(x0, y0);
-			} else {
-				x1 = x;
-				y1 = y;
-				outcode1 = ComputeOutCode(x1, y1);
-			}
-		}
-	}
-	if (accept) {
-		// Following functions are left for implementation by user based on
-		// their platform (OpenGL/graphics.h etc.)
-		DrawRectangle(xmin, ymin, xmax, ymax);
-		LineSegment(x0, y0, x1, y1);
-	}
-}
+// 			// Now we move outside point to intersection point to clip
+// 			// and get ready for next pass.
+// 			if (outcodeOut == outcode0) {
+// 				x0 = x;
+// 				y0 = y;
+// 				outcode0 = ComputeOutCode(x0, y0);
+// 			} else {
+// 				x1 = x;
+// 				y1 = y;
+// 				outcode1 = ComputeOutCode(x1, y1);
+// 			}
+// 		}
+// 	}
+// 	if (accept) {
+// 		// Following functions are left for implementation by user based on
+// 		// their platform (OpenGL/graphics.h etc.)
+// 		DrawRectangle(xmin, ymin, xmax, ymax);
+// 		LineSegment(x0, y0, x1, y1);
+// 	}
+// }
 
 //TODO: Write function that takes the new points and creates triangles:
