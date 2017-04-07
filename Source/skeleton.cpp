@@ -27,7 +27,7 @@ float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
-float f = 1.9f;
+float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 
@@ -102,7 +102,7 @@ int main( int argc, char* argv[] )
 
 bool InCuboid(glm::vec4 v)
 {
-	// cout<<v.x<< " "<< v.y<< " "<< v.z <<endl;
+	cout<<v.x<< " "<< v.y<< " "<< v.z <<endl;
 	if (v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY && v.z >= minZ && v.z <= maxZ)
 	{
 		return true;
@@ -112,9 +112,9 @@ bool InCuboid(glm::vec4 v)
 
 void SetCullingAndClipping() {
 
-    float f = 800.0f;
+    float f = 750.0f;
 	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
-	float near = cameraPos.z+fVec.z*0.1f, far = cameraPos.z+fVec.z*15.0f;
+	float near = cameraPos.z+fVec.z*0.01f, far = cameraPos.z+fVec.z*15.0f;
 	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
 
 	// Perspective matrix transformation
@@ -131,6 +131,16 @@ void SetCullingAndClipping() {
 	transform[2][2] = far/(far-near);
 	transform[3][2] = near*far/(far-near);
 	transform[3][2] = 1.0f;
+
+    // float angleOfView = 30; 
+
+    // float scale = 1 / tan(angleOfView * 0.5 * M_PI / 180); 
+    // transform[0][0] = scale; // scale the x coordinates of the projected point 
+    // transform[1][1] = scale; // scale the y coordinates of the projected point 
+    // transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
+    // transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
+    // transform[2][3] = -1; // set w = -z 
+    // transform[3][3] = 0; 
 
 
 
