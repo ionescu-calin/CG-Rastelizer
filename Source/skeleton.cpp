@@ -138,7 +138,7 @@ OutCode ComputeOutCode(float x, float y)
 
 // // TODO: Make it return a list of new vertices
 //TODO: Write function that takes the new points and creates triangles:
-void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
+void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1, vec4& p0, vec4& p1)
 {
 	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
 	OutCode outcode0 = ComputeOutCode(x0, y0);
@@ -193,8 +193,13 @@ void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
 		// their platform (OpenGL/graphics.h etc.)
 		// DrawRectangle(xmin, ymin, xmax, ymax);
 		// LineSegment(x0, y0, x1, y1);
-		cout<<x0<<" "<<y0<<" "<<x1<<" "<<y1<<endl;
+		// cout<<x0<<" "<<y0<<" "<<x1<<" "<<y1<<endl;
+		p0.x = x0; p1.x = x1;
+		p0.y = y0; p1.y = y1;
+
 	}
+
+
 }
 
 bool InCuboid(glm::vec4 v)
@@ -272,14 +277,10 @@ void SetCullingAndClipping() {
 			tv1 = tv1/tv1[3];
 			tv2 = tv2/tv2[3];
 
+
 			bool bv0 = InCuboid(tv0);
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
-			//TODO: this can probably be integrated with the vertex shader so the transforms are not done twice.
-
-			CohenSutherlandLineClipAndDraw(tv0.x, tv0.y, tv1.x, tv1.y);
-			CohenSutherlandLineClipAndDraw(tv1.x, tv1.y, tv2.x, tv2.y);
-			CohenSutherlandLineClipAndDraw(tv0.x, tv0.y, tv2.x, tv2.y);
 			// Determine culling (useless)
 			if (!bv0 && !bv1 && !bv2) {
 				triangles[i].culled = true;
