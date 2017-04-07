@@ -99,10 +99,107 @@ int main( int argc, char* argv[] )
 }
 
 
+/* 
+ * 1) Start with the line clipping algortihm
+ * 2) Apply line clipping for all of the edges of the triangle to obtain an array of points
+ * 3) reconstruct triangles from that array 
+ * 4) Go back and do the normall stuff (go from the homogenous coordinates to the projected)
+ TODO: Define xmin, ymin and xmax, ymax
+*/
+
+//For the 2D case
+const int xmin = -1.f, ymin = -1.f;
+const int xmax = 1.f, ymax = 1.f;
+typedef int OutCode;
+
+const int INSIDE = 0; // 0000
+const int LEFT = 1;   // 0001
+const int RIGHT = 2;  // 0010
+const int BOTTOM = 4; // 0100
+const int TOP = 8;    // 1000
+
+OutCode ComputeOutCode(float x, float y)
+{
+	OutCode code;
+
+	code = INSIDE;          // initialised as being inside of [[clip window]]
+
+	if (x < xmin)           // to the left of clip window
+		code |= LEFT;
+	else if (x > xmax)      // to the right of clip window
+		code |= RIGHT;
+	if (y < ymin)           // below the clip window
+		code |= BOTTOM;
+	else if (y > ymax)      // above the clip window
+		code |= TOP;
+
+	return code;
+}
+
+// // TODO: Make it return a list of new vertices
+//TODO: Write function that takes the new points and creates triangles:
+void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
+{
+	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
+	OutCode outcode0 = ComputeOutCode(x0, y0);
+	OutCode outcode1 = ComputeOutCode(x1, y1);
+	bool accept = false;
+
+	while (true) {
+		if (!(outcode0 | outcode1)) { // Bitwise OR is 0. Trivially accept and get out of loop
+			accept = true;
+			break;
+		} else if (outcode0 & outcode1) { // Bitwise AND is not 0. (implies both end points are in the same region outside the window). Reject and get out of loop
+			break;
+		} else {
+			// failed both tests, so calculate the line segment to clip
+			// from an outside point to an intersection with clip edge
+			float x, y;
+
+			// At least one endpoint is outside the clip rectangle; pick it.
+			OutCode outcodeOut = outcode0 ? outcode0 : outcode1;
+
+			// Now find the intersection point;
+			// use formulas y = y0 + slope * (x - x0), x = x0 + (1 / slope) * (y - y0)
+			if (outcodeOut & TOP) {           // point is above the clip rectangle
+				x = x0 + (x1 - x0) * (ymax - y0) / (y1 - y0);
+				y = ymax;
+			} else if (outcodeOut & BOTTOM) { // point is below the clip rectangle
+				x = x0 + (x1 - x0) * (ymin - y0) / (y1 - y0);
+				y = ymin;
+			} else if (outcodeOut & RIGHT) {  // point is to the right of clip rectangle
+				y = y0 + (y1 - y0) * (xmax - x0) / (x1 - x0);
+				x = xmax;
+			} else if (outcodeOut & LEFT) {   // point is to the left of clip rectangle
+				y = y0 + (y1 - y0) * (xmin - x0) / (x1 - x0);
+				x = xmin;
+			}
+
+			// Now we move outside point to intersection point to clip
+			// and get ready for next pass.
+			if (outcodeOut == outcode0) {
+				x0 = x;
+				y0 = y;
+				outcode0 = ComputeOutCode(x0, y0);
+			} else {
+				x1 = x;
+				y1 = y;
+				outcode1 = ComputeOutCode(x1, y1);
+			}
+		}
+	}
+	if (accept) {
+		// Following functions are left for implementation by user based on
+		// their platform (OpenGL/graphics.h etc.)
+		// DrawRectangle(xmin, ymin, xmax, ymax);
+		// LineSegment(x0, y0, x1, y1);
+		cout<<x0<<" "<<y0<<" "<<x1<<" "<<y1<<endl;
+	}
+}
 
 bool InCuboid(glm::vec4 v)
 {
-	cout<<v.x<< " "<< v.y<< " "<< v.z <<endl;
+	// cout<<v.x<< " "<< v.y<< " "<< v.z <<endl;
 	if (v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY && v.z >= minZ && v.z <= maxZ)
 	{
 		return true;
@@ -180,7 +277,9 @@ void SetCullingAndClipping() {
 			bool bv2 = InCuboid(tv2);
 			//TODO: this can probably be integrated with the vertex shader so the transforms are not done twice.
 
-			// cout<<bv0<<bv1<<bv2<<endl;
+			CohenSutherlandLineClipAndDraw(tv0.x, tv0.y, tv1.x, tv1.y);
+			CohenSutherlandLineClipAndDraw(tv1.x, tv1.y, tv2.x, tv2.y);
+			CohenSutherlandLineClipAndDraw(tv0.x, tv0.y, tv2.x, tv2.y);
 			// Determine culling (useless)
 			if (!bv0 && !bv1 && !bv2) {
 				triangles[i].culled = true;
@@ -489,100 +588,3 @@ void Draw()
     SDL_UpdateRect( screen, 0, 0, 0, 0 );
 }
 
-/* 
- * 1) Start with the line clipping algortihm
- * 2) Apply line clipping for all of the edges of the triangle to obtain an array of points
- * 3) reconstruct triangles from that array 
- * 4) Go back and do the normall stuff (go from the homogenous coordinates to the projected)
- TODO: Define xmin, ymin and xmax, ymax
-*/
-
-//For the 2D case
-const int xmin = -1.f, ymin = -1.f;
-const int xmax = 1.f, ymax = 1.f;
-typedef int OutCode;
-
-const int INSIDE = 0; // 0000
-const int LEFT = 1;   // 0001
-const int RIGHT = 2;  // 0010
-const int BOTTOM = 4; // 0100
-const int TOP = 8;    // 1000
-
-OutCode ComputeOutCode(float x, float y)
-{
-	OutCode code;
-
-	code = INSIDE;          // initialised as being inside of [[clip window]]
-
-	if (x < xmin)           // to the left of clip window
-		code |= LEFT;
-	else if (x > xmax)      // to the right of clip window
-		code |= RIGHT;
-	if (y < ymin)           // below the clip window
-		code |= BOTTOM;
-	else if (y > ymax)      // above the clip window
-		code |= TOP;
-
-	return code;
-}
-
-// // TODO: Make it return a list of new vertices
-// void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1)
-// {
-// 	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
-// 	OutCode outcode0 = ComputeOutCode(x0, y0);
-// 	OutCode outcode1 = ComputeOutCode(x1, y1);
-// 	bool accept = false;
-
-// 	while (true) {
-// 		if (!(outcode0 | outcode1)) { // Bitwise OR is 0. Trivially accept and get out of loop
-// 			accept = true;
-// 			break;
-// 		} else if (outcode0 & outcode1) { // Bitwise AND is not 0. (implies both end points are in the same region outside the window). Reject and get out of loop
-// 			break;
-// 		} else {
-// 			// failed both tests, so calculate the line segment to clip
-// 			// from an outside point to an intersection with clip edge
-// 			float x, y;
-
-// 			// At least one endpoint is outside the clip rectangle; pick it.
-// 			OutCode outcodeOut = outcode0 ? outcode0 : outcode1;
-
-// 			// Now find the intersection point;
-// 			// use formulas y = y0 + slope * (x - x0), x = x0 + (1 / slope) * (y - y0)
-// 			if (outcodeOut & TOP) {           // point is above the clip rectangle
-// 				x = x0 + (x1 - x0) * (ymax - y0) / (y1 - y0);
-// 				y = ymax;
-// 			} else if (outcodeOut & BOTTOM) { // point is below the clip rectangle
-// 				x = x0 + (x1 - x0) * (ymin - y0) / (y1 - y0);
-// 				y = ymin;
-// 			} else if (outcodeOut & RIGHT) {  // point is to the right of clip rectangle
-// 				y = y0 + (y1 - y0) * (xmax - x0) / (x1 - x0);
-// 				x = xmax;
-// 			} else if (outcodeOut & LEFT) {   // point is to the left of clip rectangle
-// 				y = y0 + (y1 - y0) * (xmin - x0) / (x1 - x0);
-// 				x = xmin;
-// 			}
-
-// 			// Now we move outside point to intersection point to clip
-// 			// and get ready for next pass.
-// 			if (outcodeOut == outcode0) {
-// 				x0 = x;
-// 				y0 = y;
-// 				outcode0 = ComputeOutCode(x0, y0);
-// 			} else {
-// 				x1 = x;
-// 				y1 = y;
-// 				outcode1 = ComputeOutCode(x1, y1);
-// 			}
-// 		}
-// 	}
-// 	if (accept) {
-// 		// Following functions are left for implementation by user based on
-// 		// their platform (OpenGL/graphics.h etc.)
-// 		DrawRectangle(xmin, ymin, xmax, ymax);
-// 		LineSegment(x0, y0, x1, y1);
-// 	}
-// }
-
-//TODO: Write function that takes the new points and creates triangles:
