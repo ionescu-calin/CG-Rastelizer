@@ -281,7 +281,6 @@ void SetCullingAndClipping() {
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
 			// Determine culling (useless)
-			if (!bv0 || !bv1 || !bv2) {
 			tv0 = tv0*inverse(transform);
 			vec3 ntv0(tv0[0], tv0[1], tv0[2]); 
 			ntv0 = ntv0*inverse(cameraR) + cameraPos;
