@@ -204,11 +204,8 @@ void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1, vec4
 
 bool InCuboid(glm::vec4 v)
 {
-	// cout<<v.x<< " "<< v.y<< " "<< v.z <<endl;
-	if (v.x >= minX && v.x <= maxX && v.y >= minY && v.y <= maxY && v.z >= minZ && v.z <= maxZ)
-	{
+	if(-v.w <= v.x && v.x <= v.w && -v.w <= v.y && v.y <= v.w && -v.w <= v.z && v.z <= v.w) 
 		return true;
-	}
 	return false;
 }
 
@@ -221,28 +218,28 @@ void SetCullingAndClipping() {
 
 	// Perspective matrix transformation
 	mat4 transform = glm::mat4(0.0f);
-	// fovy version
-	vec3 t(0.0f, -h/2.0f, f);
-	vec3 b(0.0f, h/2.0f, f);
-	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
-	float rfovy = acos(cy);
-	float fovy = (180.0f/M_PI)*rfovy;
-	float aspect = w/h;
-	transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
-	transform[1][1] = (1.0f/tan(rfovy/2.0f));
-	transform[2][2] = far/(far-near);
-	transform[3][2] = near*far/(far-near);
-	transform[3][2] = -1.0f;
+	// // fovy version
+	// vec3 t(0.0f, -h/2.0f, f);
+	// vec3 b(0.0f, h/2.0f, f);
+	// float cy = dot(t,b)/(glm::length(t)*glm::length(b));
+	// float rfovy = acos(cy);
+	// float fovy = (180.0f/M_PI)*rfovy;
+	// float aspect = w/h;
+	// transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
+	// transform[1][1] = (1.0f/tan(rfovy/2.0f));
+	// transform[2][2] = far/(far-near);
+	// transform[3][2] = near*far/(far-near);
+	// transform[3][2] = -1.0f;
 
-    // float angleOfView = 30; 
+    float angleOfView = 30; 
 
-    // float scale = 1 / tan(angleOfView * 0.5 * M_PI / 180); 
-    // transform[0][0] = scale; // scale the x coordinates of the projected point 
-    // transform[1][1] = scale; // scale the y coordinates of the projected point 
-    // transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
-    // transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
-    // transform[2][3] = -1; // set w = -z 
-    // transform[3][3] = 0; 
+    float scale = 1 / tan(angleOfView * 0.5 * M_PI / 180); 
+    transform[0][0] = scale; // scale the x coordinates of the projected point 
+    transform[1][1] = scale; // scale the y coordinates of the projected point 
+    transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
+    transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
+    transform[2][3] = -1; // set w = -z 
+    transform[3][3] = 0; 
 
 
 
@@ -273,23 +270,17 @@ void SetCullingAndClipping() {
 			tv1 = tv1*transform;
 			tv2 = tv2*transform;
 
-			tv0 = tv0/tv0[3];
-			tv1 = tv1/tv1[3];
-			tv2 = tv2/tv2[3];
-
 			bool bv0 = InCuboid(tv0);
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
-			// Determine culling (useless)
-			tv0 = tv0*inverse(transform);
-			vec3 ntv0(tv0[0], tv0[1], tv0[2]); 
-			ntv0 = ntv0*inverse(cameraR) + cameraPos;
-			cout<<ntv0[0]<< " | "<<ntv0[1]<< " | "<<ntv0[2]<< " || "<<triangles[i].v0[0]<< " | "<<triangles[i].v0[1]<< " | "<<triangles[i].v0[2]<< " || "<<endl;
 
 			if (!bv0 || !bv1 || !bv2) {
 				triangles[i].culled = true;
-			}
-			
+			}	
+
+			tv0 = tv0/tv0[3];
+			tv1 = tv1/tv1[3];
+			tv2 = tv2/tv2[3];
 		}
 	}
 }
