@@ -277,11 +277,15 @@ void SetCullingAndClipping() {
 			tv1 = tv1/tv1[3];
 			tv2 = tv2/tv2[3];
 
-			cout<<tv0[0]<< " | "<<tv0[1]<< " | "<<tv0[2]<<endl;
 			bool bv0 = InCuboid(tv0);
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
 			// Determine culling (useless)
+			tv0 = tv0*inverse(transform);
+			vec3 ntv0(tv0[0], tv0[1], tv0[2]); 
+			ntv0 = ntv0*inverse(cameraR) + cameraPos;
+			cout<<ntv0[0]<< " | "<<ntv0[1]<< " | "<<ntv0[2]<< " || "<<triangles[i].v0[0]<< " | "<<triangles[i].v0[1]<< " | "<<triangles[i].v0[2]<< " || "<<endl;
+
 			if (!bv0 || !bv1 || !bv2) {
 				triangles[i].culled = true;
 			}
