@@ -214,7 +214,7 @@ bool InCuboid(glm::vec4 v)
 
 void SetCullingAndClipping() {
 
-    float f = 190.0f;
+    float f = 251.0f;
 	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
 	float near = cameraPos.z+fVec.z*0.01f, far = cameraPos.z+fVec.z*15.0f;
 	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
@@ -281,6 +281,7 @@ void SetCullingAndClipping() {
 			bool bv1 = InCuboid(tv1);
 			bool bv2 = InCuboid(tv2);
 			// Determine culling (useless)
+			if (!bv0 || !bv1 || !bv2) {
 			tv0 = tv0*inverse(transform);
 			vec3 ntv0(tv0[0], tv0[1], tv0[2]); 
 			ntv0 = ntv0*inverse(cameraR) + cameraPos;
