@@ -276,11 +276,13 @@ void SetCullingAndClipping() {
 
 			if (!bv0 || !bv1 || !bv2) {
 				triangles[i].culled = true;
-			}	
+			}
 
 			tv0 = tv0/tv0[3];
 			tv1 = tv1/tv1[3];
 			tv2 = tv2/tv2[3];
+
+			cout<<(tv0.x+1)*0.5f*500.f<< " " << (tv0.+1)*0.5f*500.f<<endl;
 		}
 	}
 }
