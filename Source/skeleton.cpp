@@ -209,84 +209,6 @@ bool InCuboid(glm::vec4 v)
 	return false;
 }
 
-void SetCullingAndClipping() {
-
-    float f = 251.0f;
-	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
-	float near = cameraPos.z+fVec.z*0.01f, far = cameraPos.z+fVec.z*15.0f;
-	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
-
-	// Perspective matrix transformation
-	mat4 transform = glm::mat4(0.0f);
-	// fovy version
-	vec3 t(0.0f, -h/2.0f, f);
-	vec3 b(0.0f, h/2.0f, f);
-	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
-	float rfovy = acos(cy);
-	float fovy = (180.0f/M_PI)*rfovy;
-	float aspect = w/h;
-	transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
-	transform[1][1] = (1.0f/tan(rfovy/2.0f));
-	transform[2][2] = far/(far-near);
-	transform[3][2] = near*far/(far-near);
-	transform[3][2] = -1.0f;
-
-    // float angleOfView = 30; 
-
-    // float scale = 1 / tan(angleOfView * 0.5 * M_PI / 180); 
-    // transform[0][0] = scale; // scale the x coordinates of the projected point 
-    // transform[1][1] = scale; // scale the y coordinates of the projected point 
-    // transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
-    // transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
-    // transform[2][3] = -1; // set w = -z 
-    // transform[3][3] = 0; 
-
-
-
-	for( size_t i = 0; i < triangles.size(); ++i )
-	{
-		triangles[i].culled = false;
-		// Backface culling
-		if (glm::dot((triangles[i].v0-cameraPos),triangles[i].normal)>0.0f)
-		{
-			triangles[i].culled = true;
-		}
-
-		if(triangles[i].culled == false) {
-			vec3 v0 = triangles[i].v0;
-			vec3 v1 = triangles[i].v1;
-			vec3 v2 = triangles[i].v2;
-
-			// Go to view space
-			v0 = (v0-cameraPos)*cameraR;
-			v1 = (v1-cameraPos)*cameraR;
-			v2 = (v2-cameraPos)*cameraR;
-			
-			// Map to clipping space (Hopefully this is right)
-			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
-			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
-			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
-			tv0 = tv0*transform;
-			tv1 = tv1*transform;
-			tv2 = tv2*transform;
-			
-			bool bv0 = InCuboid(tv0);
-			bool bv1 = InCuboid(tv1);
-			bool bv2 = InCuboid(tv2);
-
-			if (!bv0 || !bv1 || !bv2) {
-				triangles[i].culled = true;
-			}
-
-			tv0 = tv0/tv0[3];
-			tv1 = tv1/tv1[3];
-			tv2 = tv2/tv2[3];
-
-			//cout<<(tv0.x+1)*0.5f*500.f<< " " << (tv0.+1)*0.5f*500.f<<endl;
-		}
-	}
-}
-
 
 void Update()
 {
@@ -564,9 +486,69 @@ void Draw()
 		}
 	}
 
+	//Clipping setup
+	float f = 251.0f;
+	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
+	float near = cameraPos.z+fVec.z*0.01f, far = cameraPos.z+fVec.z*15.0f;
+	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
+	// Perspective matrix transformation
+	mat4 transform = glm::mat4(0.0f);
+	// fovy version
+	vec3 t(0.0f, -h/2.0f, f);
+	vec3 b(0.0f, h/2.0f, f);
+	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
+	float rfovy = acos(cy);
+	float fovy = (180.0f/M_PI)*rfovy;
+	float aspect = w/h;
+	transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
+	transform[1][1] = (1.0f/tan(rfovy/2.0f));
+	transform[2][2] = far/(far-near);
+	transform[3][2] = near*far/(far-near);
+	transform[3][2] = -1.0f;
+	for( size_t i = 0; i < triangles.size(); ++i )
+	{
+		triangles[i].culled = false;
+	}
+
 	// #pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
+		if (glm::dot((triangles[i].v0-cameraPos),triangles[i].normal)>0.0f)
+		{
+			triangles[i].culled = true;
+		}
+
+		if(triangles[i].culled == false) {
+			vec3 v0 = triangles[i].v0;
+			vec3 v1 = triangles[i].v1;
+			vec3 v2 = triangles[i].v2;
+
+			// Go to view space
+			v0 = (v0-cameraPos)*cameraR;
+			v1 = (v1-cameraPos)*cameraR;
+			v2 = (v2-cameraPos)*cameraR;
+			
+			// Map to clipping space (Hopefully this is right)
+			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
+			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
+			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
+			tv0 = tv0*transform;
+			tv1 = tv1*transform;
+			tv2 = tv2*transform;
+			
+			bool bv0 = InCuboid(tv0);
+			bool bv1 = InCuboid(tv1);
+			bool bv2 = InCuboid(tv2);
+
+			if (!bv0 || !bv1 || !bv2) {
+				triangles[i].culled = true;
+			}
+
+			tv0 = tv0/tv0[3];
+			tv1 = tv1/tv1[3];
+			tv2 = tv2/tv2[3];
+		}
+
 		if(triangles[i].culled) 
 			continue;
 		vector<Vertex> vertices(3);
