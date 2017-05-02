@@ -225,7 +225,7 @@ void Update()
 	vec3 down(cameraR[1][0], cameraR[1][1], cameraR[1][2]);
 	vec3 forward(cameraR[2][0], cameraR[2][1], cameraR[2][2]);
 
-	SetCullingAndClipping();
+	//SetCullingAndClipping();
 	//Control camera
     if( keystate[SDLK_UP] )
     {
@@ -518,6 +518,9 @@ void Draw()
 			triangles[i].culled = true;
 		}
 
+		vec3 new_v0;
+		vec3 new_v1;
+		vec3 new_v2;
 		if(triangles[i].culled == false) {
 			vec3 v0 = triangles[i].v0;
 			vec3 v1 = triangles[i].v1;
@@ -547,15 +550,19 @@ void Draw()
 			tv0 = tv0/tv0[3];
 			tv1 = tv1/tv1[3];
 			tv2 = tv2/tv2[3];
+
+			new_v0 = vec3(tv0[0], tv0[1], tv0[2]);
+			new_v1 = vec3(tv1[0], tv1[1], tv1[2]);
+			new_v2 = vec3(tv2[0], tv2[1], tv2[2]);
 		}
 
 		if(triangles[i].culled) 
 			continue;
 		vector<Vertex> vertices(3);
 
-		vertices[0].position = triangles[i].v0;
-		vertices[1].position = triangles[i].v1;
-		vertices[2].position = triangles[i].v2;
+		vertices[0].position = new_v0;//triangles[i].v0;
+		vertices[1].position = new_v1;//triangles[i].v1;
+		vertices[2].position = new_v2;//triangles[i].v2;
 
 		vec3 currentNormal = triangles[i].normal;
 		vec3 currentReflactance = triangles[i].color;
