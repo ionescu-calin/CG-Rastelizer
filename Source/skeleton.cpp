@@ -98,10 +98,22 @@ void ApplyPostprocessing() {
 		for( int x=0; x<SCREEN_WIDTH; ++x )
 		{
 			vec3 c(0.0f, 0.0f, 0.0f);
-			//Low pass kernel
-			if(x > 0 && y > 0 && y < SCREEN_HEIGHT-1 && x < SCREEN_WIDTH-1)
-				c = image[x][y-1]/9.0f + image[x][y+1]/9.0f + image[x-1][y]/9.0f + image[x+1][y]/9.0f + image[x][y]/9.0f
-					+ image[x-1][y-1]/9.0f + image[x-1][y+1]/9.0f + image[x+1][y+1]/9.0f + image[x+1][y-1]/9.0f;
+			//Depth of field using a low pass kernel and the depth buffer
+			if(depthBuffer[x][y] > 0.3f && depthBuffer[x][y] < 0.6f) {
+					if(x > 1 && y > 1 && y < SCREEN_HEIGHT-2 && x < SCREEN_WIDTH-2) {
+					//Hard blur
+					c = image[x-2][y-2]/25.0f + image[x-2][y-1]/25.0f + image[x-2][y]/25.0f + image[x-2][y+1]/25.0f + image[x-2][y+2]/25.0f
+						+ image[x-1][y-2]/25.0f + image[x-1][y-1]/25.0f + image[x-1][y]/25.0f + image[x-1][y+1]/25.0f + image[x-1][y+2]/25.0f
+						+ image[x][y-2]/25.0f + image[x][y-1]/25.0f + image[x][y]/25.0f + image[x][y+1]/25.0f + image[x][y+2]/25.0f
+						+ image[x+1][y-2]/25.0f + image[x+1][y-1]/25.0f + image[x+1][y]/25.0f + image[x+1][y+1]/25.0f + image[x+1][y+2]/25.0f
+						+ image[x+2][y-2]/25.0f + image[x+2][y-1]/25.0f + image[x+2][y]/25.0f + image[x+2][y+1]/25.0f + image[x+2][y+2]/25.0f;
+				} else if (x > 0 && y > 0 && y < SCREEN_HEIGHT-1 && x < SCREEN_WIDTH-1) {
+					//Soft blur
+					c = image[x][y-1]/9.0f + image[x][y+1]/9.0f + image[x-1][y]/9.0f + image[x+1][y]/9.0f + image[x][y]/9.0f
+						+ image[x-1][y-1]/9.0f + image[x-1][y+1]/9.0f + image[x+1][y+1]/9.0f + image[x+1][y-1]/9.0f;
+				} 
+			} else c = image[x][y];
+			
 			PutPixelSDL( screen, x, y, c);
 		}
 	}
