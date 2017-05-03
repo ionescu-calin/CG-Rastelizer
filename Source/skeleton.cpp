@@ -504,7 +504,7 @@ void Draw()
 	transform[1][1] = (1.0f/tan(rfovy/2.0f));
 	transform[2][2] = far/(far-near);
 	transform[3][2] = near*far/(far-near);
-	transform[3][2] = -1.0f;
+	transform[3][3] = -1.0f;
 	for( size_t i = 0; i < triangles.size(); ++i )
 	{
 		triangles[i].culled = false;
@@ -525,6 +525,10 @@ void Draw()
 			vec3 v0 = triangles[i].v0;
 			vec3 v1 = triangles[i].v1;
 			vec3 v2 = triangles[i].v2;
+
+			// cout << "v0.x: " << v0.x << endl;
+			// cout << "v0.y: " << v0.y << endl;
+			// cout << "v0.z: " << v0.z << endl;
 
 			// Go to view space
 			v0 = (v0-cameraPos)*cameraR;
@@ -551,9 +555,49 @@ void Draw()
 			tv1 = tv1/tv1[3];
 			tv2 = tv2/tv2[3];
 
-			new_v0 = vec3(tv0[0], tv0[1], tv0[2]);
-			new_v1 = vec3(tv1[0], tv1[1], tv1[2]);
-			new_v2 = vec3(tv2[0], tv2[1], tv2[2]);
+			//transform the coordinates to view space
+			mat4 viewport_transform;
+
+			viewport_transform[0][0] = 0.5;
+			viewport_transform[0][1] = 0;
+			viewport_transform[0][2] = 0;
+			viewport_transform[0][3] = 0.5;
+
+			viewport_transform[1][0] = 0;
+			viewport_transform[1][1] = 0.5;
+			viewport_transform[1][2] = 0;
+			viewport_transform[1][3] = 0.5;
+
+			viewport_transform[2][0] = 0;
+			viewport_transform[2][1] = 0;
+			viewport_transform[2][2] = 0.5;
+			viewport_transform[2][3] = 0.5;
+
+			viewport_transform[3][0] = 0;
+			viewport_transform[3][1] = 0;
+			viewport_transform[3][2] = 0;
+			viewport_transform[3][3] = 1;
+
+			//apply the viewport transform matrix
+			vec4 view_tv0 = tv0 * viewport_transform;
+			vec4 view_tv1 = tv1 * viewport_transform;
+			vec4 view_tv2 = tv2 * viewport_transform;
+
+			new_v0 = vec3(view_tv0[0], view_tv0[1], view_tv0[2]);
+			new_v1 = vec3(view_tv1[0], view_tv1[1], view_tv1[2]);
+			new_v2 = vec3(view_tv2[0], view_tv2[1], view_tv2[2]);
+
+			// cout << "new_v0.x: " << new_v0.x << endl;
+			// cout << "new_v0.y: " << new_v0.y << endl;
+			// cout << "new_v0.z: " << new_v0.z << endl;
+			int new_v0_x = new_v0.x * (SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f;
+			int new_v0_y = new_v0.y * (SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f;
+			PutPixelSDL( screen, new_v0_x, new_v0_y, triangles[i].color);
+			cout << "new_v0_x: " << new_v0_x << endl;
+			cout << "new_v0_y: " << new_v0_y << endl;
+			//cout << "new_v0.z: " << new_v0.z << endl;
+			// PutPixelSDL( screen, new_v1.x, new_v1.y, triangles[i].color);
+			// PutPixelSDL( screen, new_v2.x, new_v2.y, triangles[i].color);
 		}
 
 		if(triangles[i].culled) 
@@ -567,7 +611,7 @@ void Draw()
 		vec3 currentNormal = triangles[i].normal;
 		vec3 currentReflactance = triangles[i].color;
 
-		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+		//DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
 
     if ( SDL_MUSTLOCK(screen) )
