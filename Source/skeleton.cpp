@@ -15,8 +15,10 @@ using glm::ivec2;
 #define LightMoveSpeed 0.01f
 
 #define POSTPROCESSING
-#define CHROMATICABERRATION
-#define GRAINEFFECT
+// #define CHROMATICABERRATION
+// #define GRAINEFFECT
+#define CAMERAWARPEFFECT
+int cameraSpeed = 0;
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
@@ -133,6 +135,20 @@ void ApplyPostprocessing() {
 					c = (c+grain)/2.0f;
 				}
 			#endif 
+
+			#ifdef CAMERAWARPEFFECT 
+				int cx = SCREEN_WIDTH/2;
+				int cy = SCREEN_HEIGHT/2;
+				int r = 200 - cameraSpeed, sr = r*r;
+				int sx = (x-cx)*(x-cx), sy = (y-cy)*(y-cy);
+				int power = sx + sy - sr;
+				float maxpower = cx*cx+cy*cy - sr;
+				if(power >= 0) {
+					float offset = 1.0f - cameraSpeed*(float)power/maxpower;
+					c = c*offset;//vec3(0.6f, 0.6f, 0.6f);
+				}
+
+			#endif
 			PutPixelSDL( screen, x, y, c);
 		}
 	}
@@ -161,11 +177,16 @@ void Update()
 	//Control camera
     if( keystate[SDLK_UP] )
     {
+    	cameraSpeed +=1;
 		cameraPos += MoveSpeed*forward; //Forwards
-    }
+    } 
     if( keystate[SDLK_DOWN] )
     {
+    	cameraSpeed +=1;
 		cameraPos-= MoveSpeed*forward;  //Backwards
+    }
+    if(!keystate[SDLK_UP] && !keystate[SDLK_DOWN]) {
+    	cameraSpeed = 0;
     }
     if( keystate[SDLK_j] )
     {
