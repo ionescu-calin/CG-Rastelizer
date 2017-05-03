@@ -17,8 +17,8 @@ using glm::mat4;
 #define LightMoveSpeed 0.01f
 
 #define POSTPROCESSING
-// #define CHROMATICABERRATION
-// #define GRAINEFFECT
+#define CHROMATICABERRATION
+#define GRAINEFFECT
 #define CAMERAWARPEFFECT
 int cameraSpeed = 0;
 /* ----------------------------------------------------------------------------*/
@@ -186,7 +186,7 @@ int main( int argc, char* argv[] )
 #ifdef POSTPROCESSING
 
 vec3 image[SCREEN_HEIGHT][SCREEN_WIDTH];
-void ApplyPostprocessing() {
+void ApplyPostprocessing() {	
 	for( int y=0; y<SCREEN_HEIGHT; ++y )
 	{
 		for( int x=0; x<SCREEN_WIDTH; ++x )
@@ -229,7 +229,7 @@ void ApplyPostprocessing() {
 			#ifdef CAMERAWARPEFFECT 
 				int cx = SCREEN_WIDTH/2;
 				int cy = SCREEN_HEIGHT/2;
-				int r = 200 - cameraSpeed, sr = r*r;
+				int rr = 200 - cameraSpeed, sr = rr*rr;
 				int sx = (x-cx)*(x-cx), sy = (y-cy)*(y-cy);
 				int power = sx + sy - sr;
 				float maxpower = cx*cx+cy*cy - sr;
@@ -246,6 +246,7 @@ void ApplyPostprocessing() {
 		for( int x=0; x<SCREEN_WIDTH; ++x ) 
 			image[x][y] = vec3(0.0f, 0.0f, 0.0f);
 }
+
 
 #endif
 
@@ -602,7 +603,12 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 					depthBuffer[y][x] = p.zinv;
 					vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
 					currentColor = currentColor * (R + frameBuffer[y][x]);
-					PutPixelSDL( screen, x, y, currentColor );
+					// PutPixelSDL( screen, x, y, currentColor );
+					#ifndef POSTPROCESSING
+						PutPixelSDL( screen, x, y, currentColor);
+					#else 
+						image[x][y] = currentColor;
+					#endif
 				}
 			}
 			else 
@@ -971,10 +977,6 @@ void Draw()
 		}
 	}
 
-	#ifdef POSTPROCESSING
-		ApplyPostprocessing();
-	#endif	
-
 	// Disable writing to stencil buffer
 	stencilBuffering = 0;
 	RenderTriangles(triangles);
@@ -1008,6 +1010,10 @@ void Draw()
 
 	// Render scene preforming depth and stencil test
 	RenderTriangles(triangles);
+
+	#ifdef POSTPROCESSING
+		ApplyPostprocessing();
+	#endif	
 
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
