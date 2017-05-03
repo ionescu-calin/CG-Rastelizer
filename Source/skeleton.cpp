@@ -57,6 +57,8 @@ struct Vertex
 	vec3 position;
 };
 
+// Colours
+vec3 pink( 1.000, 0.078, 0.576 );
 
 //Clipping Bounds:
 float minX = -1.0f;
@@ -291,31 +293,6 @@ void Update()
 	}
 }
 
-void VertexShader( const Vertex& v, Pixel& p ) 
-{
-	vec3 p_p = vec3(v.position.x, v.position.y, v.position.z);	
-
-	p_p = (p_p - cameraPos) * cameraR;
-
-	if (p_p.z == 0)
-		return;
-
-	p.zinv = 1.0f/p_p.z;
-	p.x = (int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
-	p.y = (int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);	
-
-	//Storing the 3D position of the Vertex to the corresponding 
-	//variable in Pixel
-	p.pos3d.x = v.position.x;
-	p.pos3d.y = v.position.y;
-	p.pos3d.z = v.position.z;
-	
-	p.pos3d = p.pos3d/p_p.z;
-	p.z_value = p_p.z;
-
-	p.toLight = normalize(p_p - lightPos);
-}
-
 vec3 ComputePixelDirectionalLight( const Pixel& p, vec3 currentNormal, vec3 currentReflactance)
 {
 	vec3 n = currentNormal;
@@ -459,16 +436,149 @@ void DrawRows( const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels
 	}
 }
 
-void DrawPolygon( const vector<Vertex>& vertices, vec3 color, vec3 currentNormal, vec3 currentReflactance )
+void VertexShader( const Vertex& v, Pixel& p ) 
 {
+	vec3 p_p = vec3(v.position.x, v.position.y, v.position.z);	
+
+	if (p_p.z == 0)
+		return;
+
+	p.zinv = 1.0f/p_p.z;
+	p.x = (int)(p_p.x/p_p.z) * SCREEN_WIDTH;//(int)((f*p_p.x/p_p.z)*(SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f);
+	p.y = (int)(p_p.y/p_p.z) * SCREEN_HEIGHT;//(int)((f*p_p.y/p_p.z)*(SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f);
+
+	PutPixelSDL( screen, p.x, p.y, pink);	
+
+	//Storing the 3D position of the Vertex to the corresponding 
+	//variable in Pixel
+	p.pos3d.x = v.position.x;
+	p.pos3d.y = v.position.y;
+	p.pos3d.z = v.position.z;
+	
+	p.pos3d = p.pos3d/p_p.z;
+	p.z_value = p_p.z;
+
+	p.toLight = normalize(p_p - lightPos);
+}
+
+/**
+ Function to get the vertex in clipping space
+
+ @v - triangle vertex
+ @clip_v - triangle vertex in clipping space
+ **/
+vec4 InitialVertexShader( const vec3& v )
+{
+	//Clipping setup
+	float f = 251.0f;
+	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
+	float near = cameraPos.z+fVec.z*0.01f, far = cameraPos.z+fVec.z*15.0f;
+	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
+	// Perspective matrix transformation
+	mat4 transform = glm::mat4(0.0f);
+	// fovy version
+	vec3 t(0.0f, -h/2.0f, f);
+	vec3 b(0.0f, h/2.0f, f);
+	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
+	float rfovy = acos(cy);
+	float fovy = (180.0f/M_PI)*rfovy;
+	float aspect = w/h;
+
+	float scale = 1 / tan(90.0f * 0.5f * M_PI / 180); 
+    transform[0][0] = scale; // scale the x coordinates of the projected point 
+    transform[1][1] = scale; // scale the y coordinates of the projected point 
+    transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
+    transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
+    transform[2][3] = -1; // set w = -z 
+    transform[3][3] = 0;
+
+    // Go to view space
+    vec3 v_v = (v - cameraPos) * cameraR;
+	
+	// Map to clipping space (Hopefully this is right)
+	vec4 tv = glm::vec4(v_v.x, v_v.y, v_v.z, 1.0f);
+	tv = tv*transform;
+
+	return tv;
+}
+
+vec3 SecondVertexShader( const vec4& _tv )
+{	
+	
+	vec4 tv = _tv/_tv[3];
+
+	mat4 viewport_transform;
+
+	viewport_transform[0][0] = 0.5;
+	viewport_transform[0][1] = 0;
+	viewport_transform[0][2] = 0;
+	viewport_transform[0][3] = 0.5;
+
+	viewport_transform[1][0] = 0;
+	viewport_transform[1][1] = 0.5;
+	viewport_transform[1][2] = 0;
+	viewport_transform[1][3] = 0.5;
+
+	viewport_transform[2][0] = 0;
+	viewport_transform[2][1] = 0;
+	viewport_transform[2][2] = 0.5;
+	viewport_transform[2][3] = 0.5;
+
+	viewport_transform[3][0] = 0;
+	viewport_transform[3][1] = 0;
+	viewport_transform[3][2] = 0;
+	viewport_transform[3][3] = 1;
+
+	//apply the viewport transform matrix
+	vec4 view_tv = tv * viewport_transform;
+	vec3 new_view = vec3(view_tv[0], view_tv[1], view_tv[2]);
+
+	return new_view;
+}
+
+void DrawPolygon( const vector<Vertex>& vertices, vec3 color, vec3 currentNormal, vec3 currentReflactance )
+{ 
+    // Get the positions of the triangle vertexes
+    vec3 v0 = vertices[0].position;
+    vec3 v1 = vertices[1].position;
+    vec3 v2 = vertices[2].position;
+
+    // Get the vertices in clipping space
+    vec4 tv0 = InitialVertexShader(v0);
+    vec4 tv1 = InitialVertexShader(v1);
+    vec4 tv2 = InitialVertexShader(v2);
+
+    //perform clipping
+    bool bv0 = InCuboid(tv0);
+	bool bv1 = InCuboid(tv1);
+	bool bv2 = InCuboid(tv2);
+
+	//to be replaced with the main clipping algorithm
+	if (!bv0 || !bv1 || !bv2) {
+		//triangles[i].culled = true;
+	}
+
+    //convert to window space
+    v0 = SecondVertexShader(tv0);
+    v1 = SecondVertexShader(tv1);
+    v2 = SecondVertexShader(tv2);
+
+    //put the new vertices back in the vector
+    //and apply final vertex shader
+    vector<Vertex> new_vertices(3);
+
+    new_vertices[0].position = v0;
+    new_vertices[1].position = v1;
+    new_vertices[2].position = v2;
+
     int V = vertices.size();
     vector<Pixel> vertexPixels( V );
     for( int i=0; i<V; ++i )
-		VertexShader( vertices[i], vertexPixels[i] );
+    	VertexShader( new_vertices[i], vertexPixels[i] );
     vector<Pixel> leftPixels;
     vector<Pixel> rightPixels;
     ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	DrawRows( leftPixels, rightPixels, color, currentNormal, currentReflactance);
+    DrawRows( leftPixels, rightPixels, color, currentNormal, currentReflactance);
 }
 
 
@@ -486,33 +596,15 @@ void Draw()
 		}
 	}
 
-	//Clipping setup
-	float f = 251.0f;
-	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
-	float near = cameraPos.z+fVec.z*0.01f, far = cameraPos.z+fVec.z*15.0f;
-	float w = (float)SCREEN_WIDTH, h = (float)SCREEN_HEIGHT;
-	// Perspective matrix transformation
-	mat4 transform = glm::mat4(0.0f);
-	// fovy version
-	vec3 t(0.0f, -h/2.0f, f);
-	vec3 b(0.0f, h/2.0f, f);
-	float cy = dot(t,b)/(glm::length(t)*glm::length(b));
-	float rfovy = acos(cy);
-	float fovy = (180.0f/M_PI)*rfovy;
-	float aspect = w/h;
+	//previous transform matrix for clipping 
+	//was not producing the correct result - image was flipped
+
 	// transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
 	// transform[1][1] = (1.0f/tan(rfovy/2.0f));
 	// transform[2][2] = far/(far-near);
 	// transform[3][2] = near*far/(far-near);
 	// transform[3][3] = -1.0f;
-	float scale = 1 / tan(90.0f * 0.5f * M_PI / 180); 
-    transform[0][0] = scale; // scale the x coordinates of the projected point 
-    transform[1][1] = scale; // scale the y coordinates of the projected point 
-    transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
-    transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
-    transform[2][3] = -1; // set w = -z 
-    transform[3][3] = 0;
-	
+
 	for( size_t i = 0; i < triangles.size(); ++i )
 	{
 		triangles[i].culled = false;
@@ -526,70 +618,70 @@ void Draw()
 			triangles[i].culled = true;
 		}
 
-		vec3 new_v0;
-		vec3 new_v1;
-		vec3 new_v2;
-		if(triangles[i].culled == false) {
-			vec3 v0 = triangles[i].v0;
-			vec3 v1 = triangles[i].v1;
-			vec3 v2 = triangles[i].v2;
+		// vec3 new_v0;
+		// vec3 new_v1;
+		// vec3 new_v2;
+		// if(triangles[i].culled == false) {
+			// vec3 v0 = triangles[i].v0;
+			// vec3 v1 = triangles[i].v1;
+			// vec3 v2 = triangles[i].v2;
 
-			// Go to view space
-			v0 = (v0-cameraPos)*cameraR;
-			v1 = (v1-cameraPos)*cameraR;
-			v2 = (v2-cameraPos)*cameraR;
+			// // Go to view space
+			// v0 = (v0-cameraPos)*cameraR;
+			// v1 = (v1-cameraPos)*cameraR;
+			// v2 = (v2-cameraPos)*cameraR;
 			
-			// Map to clipping space (Hopefully this is right)
-			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
-			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
-			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
-			tv0 = tv0*transform;
-			tv1 = tv1*transform;
-			tv2 = tv2*transform;
+			// // Map to clipping space (Hopefully this is right)
+			// vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
+			// vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
+			// vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
+			// tv0 = tv0*transform;
+			// tv1 = tv1*transform;
+			// tv2 = tv2*transform;
 			
-			bool bv0 = InCuboid(tv0);
-			bool bv1 = InCuboid(tv1);
-			bool bv2 = InCuboid(tv2);
+			// bool bv0 = InCuboid(tv0);
+			// bool bv1 = InCuboid(tv1);
+			// bool bv2 = InCuboid(tv2);
 
-			if (!bv0 || !bv1 || !bv2) {
-				triangles[i].culled = true;
-			}
+			// if (!bv0 || !bv1 || !bv2) {
+			// 	triangles[i].culled = true;
+			// }
 
-			tv0 = tv0/tv0[3];
-			tv1 = tv1/tv1[3];
-			tv2 = tv2/tv2[3];
+			// tv0 = tv0/tv0[3];
+			// tv1 = tv1/tv1[3];
+			// tv2 = tv2/tv2[3];
 
 			//transform the coordinates to view space
-			mat4 viewport_transform;
+			// mat4 viewport_transform;
 
-			viewport_transform[0][0] = 0.5;
-			viewport_transform[0][1] = 0;
-			viewport_transform[0][2] = 0;
-			viewport_transform[0][3] = 0.5;
+			// viewport_transform[0][0] = 0.5;
+			// viewport_transform[0][1] = 0;
+			// viewport_transform[0][2] = 0;
+			// viewport_transform[0][3] = 0.5;
 
-			viewport_transform[1][0] = 0;
-			viewport_transform[1][1] = 0.5;
-			viewport_transform[1][2] = 0;
-			viewport_transform[1][3] = 0.5;
+			// viewport_transform[1][0] = 0;
+			// viewport_transform[1][1] = 0.5;
+			// viewport_transform[1][2] = 0;
+			// viewport_transform[1][3] = 0.5;
 
-			viewport_transform[2][0] = 0;
-			viewport_transform[2][1] = 0;
-			viewport_transform[2][2] = 0.5;
-			viewport_transform[2][3] = 0.5;
+			// viewport_transform[2][0] = 0;
+			// viewport_transform[2][1] = 0;
+			// viewport_transform[2][2] = 0.5;
+			// viewport_transform[2][3] = 0.5;
 
-			viewport_transform[3][0] = 0;
-			viewport_transform[3][1] = 0;
-			viewport_transform[3][2] = 0;
-			viewport_transform[3][3] = 1;
+			// viewport_transform[3][0] = 0;
+			// viewport_transform[3][1] = 0;
+			// viewport_transform[3][2] = 0;
+			// viewport_transform[3][3] = 1;
 
-			//apply the viewport transform matrix
-			vec4 view_tv0 = tv0 * viewport_transform;
-			vec4 view_tv1 = tv1 * viewport_transform;
-			vec4 view_tv2 = tv2 * viewport_transform;
+			// //apply the viewport transform matrix
+			// vec4 view_tv0 = tv0 * viewport_transform;
+			// vec4 view_tv1 = tv1 * viewport_transform;
+			// vec4 view_tv2 = tv2 * viewport_transform;
 
-			new_v0 = vec3(view_tv0[0], view_tv0[1], view_tv0[2]);
-			new_v1 = vec3(view_tv1[0], view_tv1[1], view_tv1[2]);
-			new_v2 = vec3(view_tv2[0], view_tv2[1], view_tv2[2]);
+			// new_v0 = vec3(view_tv0[0], view_tv0[1], view_tv0[2]);
+			// new_v1 = vec3(view_tv1[0], view_tv1[1], view_tv1[2]);
+			// new_v2 = vec3(view_tv2[0], view_tv2[1], view_tv2[2]);
 
 			// cout << "new_v0.x: " << new_v0.x << endl;
 			// cout << "new_v0.y: " << new_v0.y << endl;
@@ -609,13 +701,13 @@ void Draw()
 
 			// cout << "new_v0_x: " << new_v0_x << endl;
 			// cout << "new_v0_y: " << new_v0_y << endl;
-			//cout << "new_v0.z: " << new_v0.z << endl;
+			// cout << "new_v0.z: " << new_v0.z << endl;
 			// PutPixelSDL( screen, new_v1.x, new_v1.y, triangles[i].color);
 			// PutPixelSDL( screen, new_v2.x, new_v2.y, triangles[i].color);
-		}
+		//}
 
-		if(triangles[i].culled) 
-			continue;
+		// if(triangles[i].culled) 
+		// 	continue;
 		vector<Vertex> vertices(3);
 
 		vertices[0].position = triangles[i].v0;
@@ -625,7 +717,7 @@ void Draw()
 		vec3 currentNormal = triangles[i].normal;
 		vec3 currentReflactance = triangles[i].color;
 
-		//DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
 
     if ( SDL_MUSTLOCK(screen) )
