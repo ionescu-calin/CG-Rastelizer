@@ -16,6 +16,11 @@ using glm::mat4;
 #define MoveSpeed 0.01f
 #define LightMoveSpeed 0.01f
 
+#define POSTPROCESSING
+// #define CHROMATICABERRATION
+// #define GRAINEFFECT
+#define CAMERAWARPEFFECT
+int cameraSpeed = 0;
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS */
 struct Pixel
@@ -178,6 +183,73 @@ int main( int argc, char* argv[] )
 }
 
 
+#ifdef POSTPROCESSING
+
+vec3 image[SCREEN_HEIGHT][SCREEN_WIDTH];
+void ApplyPostprocessing() {
+	for( int y=0; y<SCREEN_HEIGHT; ++y )
+	{
+		for( int x=0; x<SCREEN_WIDTH; ++x )
+		{
+			vec3 c(0.0f, 0.0f, 0.0f);
+			//Depth of field using a low pass kernel and the depth buffer
+			if(depthBuffer[x][y] > 0.3f && depthBuffer[x][y] < 0.6f) {
+					if(x > 1 && y > 1 && y < SCREEN_HEIGHT-2 && x < SCREEN_WIDTH-2) {
+					//Hard blur
+					c = image[x-2][y-2]/25.0f + image[x-2][y-1]/25.0f + image[x-2][y]/25.0f + image[x-2][y+1]/25.0f + image[x-2][y+2]/25.0f
+						+ image[x-1][y-2]/25.0f + image[x-1][y-1]/25.0f + image[x-1][y]/25.0f + image[x-1][y+1]/25.0f + image[x-1][y+2]/25.0f
+						+ image[x][y-2]/25.0f + image[x][y-1]/25.0f + image[x][y]/25.0f + image[x][y+1]/25.0f + image[x][y+2]/25.0f
+						+ image[x+1][y-2]/25.0f + image[x+1][y-1]/25.0f + image[x+1][y]/25.0f + image[x+1][y+1]/25.0f + image[x+1][y+2]/25.0f
+						+ image[x+2][y-2]/25.0f + image[x+2][y-1]/25.0f + image[x+2][y]/25.0f + image[x+2][y+1]/25.0f + image[x+2][y+2]/25.0f;
+				} else if (x > 0 && y > 0 && y < SCREEN_HEIGHT-1 && x < SCREEN_WIDTH-1) {
+					//Soft blur
+					c = image[x][y-1]/9.0f + image[x][y+1]/9.0f + image[x-1][y]/9.0f + image[x+1][y]/9.0f + image[x][y]/9.0f
+						+ image[x-1][y-1]/9.0f + image[x-1][y+1]/9.0f + image[x+1][y+1]/9.0f + image[x+1][y-1]/9.0f;
+				} 
+			} else c = image[x][y];
+			
+			#ifdef CHROMATICABERRATION
+				int r = 10;//rand()%5;
+				if(x-r>0 && y-r>0)
+					c = (c + image[x-r][y-r].x)/vec3(2.0f, 1.0f, 1.0f);
+				if(x+r<SCREEN_WIDTH && y+r < SCREEN_HEIGHT)
+					c = (c + image[x+r][y+r].y)/vec3(1.0f, 2.0f, 1.0f);
+				if(y-r>0 && x+r<SCREEN_WIDTH)
+					c = (c + image[x+r][y-r].z)/vec3(1.0f, 1.0f, 2.0f);
+			#endif
+
+			#ifdef GRAINEFFECT
+				int g = rand()%2;
+				if(g) {
+					vec3 grain((float(rand()%100)/100.f), float((rand()%100)/100.f), float((rand()%100)/100.f)); 
+					c = (c+grain)/2.0f;
+				}
+			#endif 
+
+			#ifdef CAMERAWARPEFFECT 
+				int cx = SCREEN_WIDTH/2;
+				int cy = SCREEN_HEIGHT/2;
+				int r = 200 - cameraSpeed, sr = r*r;
+				int sx = (x-cx)*(x-cx), sy = (y-cy)*(y-cy);
+				int power = sx + sy - sr;
+				float maxpower = cx*cx+cy*cy - sr;
+				if(power >= 0) {
+					float offset = 1.0f - cameraSpeed*(float)power/maxpower;
+					c = c*offset;//vec3(0.6f, 0.6f, 0.6f);
+				}
+
+			#endif
+			PutPixelSDL( screen, x, y, c);
+		}
+	}
+	for( int y=0; y<SCREEN_HEIGHT; ++y )
+		for( int x=0; x<SCREEN_WIDTH; ++x ) 
+			image[x][y] = vec3(0.0f, 0.0f, 0.0f);
+}
+
+#endif
+
+
 /* 
  * 1) Start with the line clipping algortihm
  * 2) Apply line clipping for all of the edges of the triangle to obtain an array of points
@@ -308,11 +380,16 @@ void Update()
 	//Control camera
     if( keystate[SDLK_UP] )
     {
+    	cameraSpeed +=1;
 		cameraPos += MoveSpeed*forward; //Forwards
-    }
+    } 
     if( keystate[SDLK_DOWN] )
     {
+    	cameraSpeed +=1;
 		cameraPos-= MoveSpeed*forward;  //Backwards
+    }
+    if(!keystate[SDLK_UP] && !keystate[SDLK_DOWN]) {
+    	cameraSpeed = 0;
     }
     if( keystate[SDLK_j] )
     {
@@ -893,6 +970,10 @@ void Draw()
 			new_v2 = vec3(view_tv2[0], view_tv2[1], view_tv2[2]);
 		}
 	}
+
+	#ifdef POSTPROCESSING
+		ApplyPostprocessing();
+	#endif	
 
 	// Disable writing to stencil buffer
 	stencilBuffering = 0;
