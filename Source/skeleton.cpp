@@ -526,10 +526,6 @@ void Draw()
 			vec3 v1 = triangles[i].v1;
 			vec3 v2 = triangles[i].v2;
 
-			// cout << "v0.x: " << v0.x << endl;
-			// cout << "v0.y: " << v0.y << endl;
-			// cout << "v0.z: " << v0.z << endl;
-
 			// Go to view space
 			v0 = (v0-cameraPos)*cameraR;
 			v1 = (v1-cameraPos)*cameraR;
@@ -590,9 +586,19 @@ void Draw()
 			// cout << "new_v0.x: " << new_v0.x << endl;
 			// cout << "new_v0.y: " << new_v0.y << endl;
 			// cout << "new_v0.z: " << new_v0.z << endl;
-			int new_v0_x = new_v0.x * (SCREEN_WIDTH/2.0f) + SCREEN_WIDTH/2.0f;
-			int new_v0_y = new_v0.y * (SCREEN_HEIGHT/2.0f) + SCREEN_HEIGHT/2.0f;
+			int new_v0_x = new_v0.x * SCREEN_WIDTH;
+			int new_v0_y = new_v0.y * SCREEN_HEIGHT;
+
+			int new_v1_x = new_v1.x * SCREEN_WIDTH;
+			int new_v1_y = new_v1.y * SCREEN_HEIGHT;
+
+			int new_v2_x = new_v2.x * SCREEN_WIDTH;
+			int new_v2_y = new_v2.y * SCREEN_HEIGHT;
+
 			PutPixelSDL( screen, new_v0_x, new_v0_y, triangles[i].color);
+			PutPixelSDL( screen, new_v1_x, new_v1_y, triangles[i].color);
+			PutPixelSDL( screen, new_v2_x, new_v2_y, triangles[i].color);
+
 			cout << "new_v0_x: " << new_v0_x << endl;
 			cout << "new_v0_y: " << new_v0_y << endl;
 			//cout << "new_v0.z: " << new_v0.z << endl;
