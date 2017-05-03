@@ -90,7 +90,7 @@ int renderBackFaces = 0;
 int t;
 mat3 cameraR;
 vec3 cameraPos( 0, 0, -3.001 );
-float f = 2.0f;
+float f = 1.0f;
 float yaw = 0.0f;
 vector<Triangle> triangles;
 vector<Object> sceneObjects;
@@ -110,21 +110,6 @@ vec3 lightDirection(1.f, -0.5f, -0.7f);
 
 /*SHADOW VOLUME*/
 vec3 ExtrdudeMagnitude(1.f, 1.f, 1.f);
-
-struct Pixel
-{
-    int x;
-    int y;
-    float zinv;
-    vec3 pos3d;
-    float z_value;
-    vec3 toLight; //Keeps the distance to light
-};
-
-struct Vertex
-{
-	vec3 position;
-};
 
 
 //Clipping Bounds:
@@ -698,6 +683,9 @@ void RenderTriangles(vector<Triangle> triangles)
 	//#pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
+		if(triangles[i].culled) {
+			continue;
+		}
 		vector<Vertex> vertices(3);
 
 		vertices[0].position = triangles[i].v0;
@@ -805,6 +793,7 @@ void Draw()
 	vector<Quad> quads;
 	vector<Triangle> caps;
 	ComputeSilhouettes(sceneObjects, quads, caps);
+
 	//Clipping setup
 	float f = 251.0f;
 	vec3 fVec = glm::normalize(vec3(0,0,1.0f)*cameraR);
@@ -819,13 +808,11 @@ void Draw()
 	float rfovy = acos(cy);
 	float fovy = (180.0f/M_PI)*rfovy;
 	float aspect = w/h;
-	float scale = 1 / tan(90.0f * 0.5f * M_PI / 180); 
-    transform[0][0] = scale; // scale the x coordinates of the projected point 
-    transform[1][1] = scale; // scale the y coordinates of the projected point 
-    transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
-    transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
-    transform[2][3] = -1; // set w = -z 
-    transform[3][3] = 0;
+	transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
+	transform[1][1] = (1.0f/tan(rfovy/2.0f));
+	transform[2][2] = far/(far-near);
+	transform[3][2] = near*far/(far-near);
+	transform[3][3] = -1.0f;
 	
 	for( size_t i = 0; i < triangles.size(); ++i )
 	{
@@ -905,10 +892,7 @@ void Draw()
 			new_v1 = vec3(view_tv1[0], view_tv1[1], view_tv1[2]);
 			new_v2 = vec3(view_tv2[0], view_tv2[1], view_tv2[2]);
 		}
-
-		if(triangles[i].culled) 
-			continue;
-		vector<Vertex> vertices(3);
+	}
 
 	// Disable writing to stencil buffer
 	stencilBuffering = 0;
@@ -947,5 +931,5 @@ void Draw()
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
     SDL_UpdateRect( screen, 0, 0, 0, 0 );
-}
 
+}
