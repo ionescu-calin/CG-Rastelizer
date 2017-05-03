@@ -97,7 +97,12 @@ void ApplyPostprocessing() {
 	{
 		for( int x=0; x<SCREEN_WIDTH; ++x )
 		{
-			PutPixelSDL( screen, x, y, image[x][y]);
+			vec3 c(0.0f, 0.0f, 0.0f);
+			//Low pass kernel
+			if(x > 0 && y > 0 && y < SCREEN_HEIGHT-1 && x < SCREEN_WIDTH-1)
+				c = image[x][y-1]/9.0f + image[x][y+1]/9.0f + image[x-1][y]/9.0f + image[x+1][y]/9.0f + image[x][y]/9.0f
+					+ image[x-1][y-1]/9.0f + image[x-1][y+1]/9.0f + image[x+1][y+1]/9.0f + image[x+1][y-1]/9.0f;
+			PutPixelSDL( screen, x, y, c);
 		}
 	}
 }
