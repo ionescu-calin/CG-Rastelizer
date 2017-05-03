@@ -15,6 +15,7 @@ using glm::ivec2;
 #define LightMoveSpeed 0.01f
 
 #define POSTPROCESSING
+#define CHROMATICABERRATION
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
@@ -114,9 +115,15 @@ void ApplyPostprocessing() {
 				} 
 			} else c = image[x][y];
 			
+			#ifdef CHROMATICABERRATION
+				c = (c + image[x][y+1].y)/2.0f;
+			#endif
 			PutPixelSDL( screen, x, y, c);
 		}
 	}
+	for( int y=0; y<SCREEN_HEIGHT; ++y )
+		for( int x=0; x<SCREEN_WIDTH; ++x ) 
+			image[x][y] = vec3(0.0f, 0.0f, 0.0f);
 }
 
 #endif
