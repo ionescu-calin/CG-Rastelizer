@@ -116,7 +116,11 @@ void ApplyPostprocessing() {
 			} else c = image[x][y];
 			
 			#ifdef CHROMATICABERRATION
-				c = (c + image[x][y+1].y)/2.0f;
+				int r = 3;//rand()%5;
+
+				c = (c + image[x-r][y-r].x)/vec3(2.0f, 1.0f, 1.0f);
+				c = (c + image[x+r][y+r].y)/vec3(1.0f, 2.0f, 1.0f);
+				c = (c + image[x+r][y-r].z)/vec3(1.0f, 1.0f, 2.0f);
 			#endif
 			PutPixelSDL( screen, x, y, c);
 		}
