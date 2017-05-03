@@ -500,11 +500,14 @@ void Draw()
 	float rfovy = acos(cy);
 	float fovy = (180.0f/M_PI)*rfovy;
 	float aspect = w/h;
-	transform[0][0] = (1.0f/tan(rfovy/2.0f))/aspect;
-	transform[1][1] = (1.0f/tan(rfovy/2.0f));
-	transform[2][2] = far/(far-near);
-	transform[3][2] = near*far/(far-near);
-	transform[3][3] = -1.0f;
+	float scale = 1 / tan(90.0f * 0.5f * M_PI / 180); 
+    transform[0][0] = scale; // scale the x coordinates of the projected point 
+    transform[1][1] = scale; // scale the y coordinates of the projected point 
+    transform[2][2] = -far / (far - near); // used to remap z to [0,1] 
+    transform[3][2] = -far * near / (far - near); // used to remap z [0,1] 
+    transform[2][3] = -1; // set w = -z 
+    transform[3][3] = 0;
+	
 	for( size_t i = 0; i < triangles.size(); ++i )
 	{
 		triangles[i].culled = false;
@@ -582,42 +585,20 @@ void Draw()
 			new_v0 = vec3(view_tv0[0], view_tv0[1], view_tv0[2]);
 			new_v1 = vec3(view_tv1[0], view_tv1[1], view_tv1[2]);
 			new_v2 = vec3(view_tv2[0], view_tv2[1], view_tv2[2]);
-
-			// cout << "new_v0.x: " << new_v0.x << endl;
-			// cout << "new_v0.y: " << new_v0.y << endl;
-			// cout << "new_v0.z: " << new_v0.z << endl;
-			int new_v0_x = new_v0.x * SCREEN_WIDTH;
-			int new_v0_y = new_v0.y * SCREEN_HEIGHT;
-
-			int new_v1_x = new_v1.x * SCREEN_WIDTH;
-			int new_v1_y = new_v1.y * SCREEN_HEIGHT;
-
-			int new_v2_x = new_v2.x * SCREEN_WIDTH;
-			int new_v2_y = new_v2.y * SCREEN_HEIGHT;
-
-			PutPixelSDL( screen, new_v0_x, new_v0_y, triangles[i].color);
-			PutPixelSDL( screen, new_v1_x, new_v1_y, triangles[i].color);
-			PutPixelSDL( screen, new_v2_x, new_v2_y, triangles[i].color);
-
-			cout << "new_v0_x: " << new_v0_x << endl;
-			cout << "new_v0_y: " << new_v0_y << endl;
-			//cout << "new_v0.z: " << new_v0.z << endl;
-			// PutPixelSDL( screen, new_v1.x, new_v1.y, triangles[i].color);
-			// PutPixelSDL( screen, new_v2.x, new_v2.y, triangles[i].color);
 		}
 
 		if(triangles[i].culled) 
 			continue;
 		vector<Vertex> vertices(3);
 
-		vertices[0].position = new_v0;//triangles[i].v0;
-		vertices[1].position = new_v1;//triangles[i].v1;
-		vertices[2].position = new_v2;//triangles[i].v2;
+		vertices[0].position = triangles[i].v0;
+		vertices[1].position = triangles[i].v1;
+		vertices[2].position = triangles[i].v2;
 
 		vec3 currentNormal = triangles[i].normal;
 		vec3 currentReflactance = triangles[i].color;
 
-		//DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
 
     if ( SDL_MUSTLOCK(screen) )
