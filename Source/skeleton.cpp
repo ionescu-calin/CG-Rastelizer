@@ -14,6 +14,7 @@ using glm::ivec2;
 #define MoveSpeed 0.05f
 #define LightMoveSpeed 0.01f
 
+#define POSTPROCESSING
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
@@ -86,6 +87,22 @@ int main( int argc, char* argv[] )
 	SDL_SaveBMP( screen, "screenshot.bmp" );
 	return 0;
 }
+
+
+#ifdef POSTPROCESSING
+
+vec3 image[SCREEN_HEIGHT][SCREEN_WIDTH];
+void ApplyPostprocessing() {
+	for( int y=0; y<SCREEN_HEIGHT; ++y )
+	{
+		for( int x=0; x<SCREEN_WIDTH; ++x )
+		{
+			PutPixelSDL( screen, x, y, image[x][y]);
+		}
+	}
+}
+
+#endif
 
 void Update()
 {
@@ -222,7 +239,11 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 		depthBuffer[y][x] = p.zinv;
 		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
 		R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
-		PutPixelSDL( screen, x, y, currentColor * R);
+		#ifndef POSTPROCESSING
+			PutPixelSDL( screen, x, y, currentColor * R);
+		#else 
+			image[x][y] = currentColor * R;
+		#endif
 	}
 }
 
@@ -347,7 +368,6 @@ void DrawPolygon( const vector<Vertex>& vertices, vec3 color, vec3 currentNormal
 	DrawRows( leftPixels, rightPixels, color, currentNormal, currentReflactance);
 }
 
-
 void Draw() 
 {
 	SDL_FillRect( screen, 0, 0 );
@@ -376,6 +396,10 @@ void Draw()
 
 		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
+
+	#ifdef POSTPROCESSING
+		ApplyPostprocessing();
+	#endif	
 
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
