@@ -538,11 +538,37 @@ void Draw()
 			v0 = (v0-cameraPos)*cameraR;
 			v1 = (v1-cameraPos)*cameraR;
 			v2 = (v2-cameraPos)*cameraR;
+			mat4 camera_matrix;
+			camera_matrix[0][0] = cameraR[0][0];
+			camera_matrix[1][0] = cameraR[1][0];
+			camera_matrix[2][0] = cameraR[2][0];
+
+			camera_matrix[0][1] = cameraR[0][1];
+			camera_matrix[1][1] = cameraR[1][1];
+			camera_matrix[2][1] = cameraR[2][1];
+
+			camera_matrix[0][2] = cameraR[0][2];
+			camera_matrix[1][2] = cameraR[1][2];
+			camera_matrix[2][2] = cameraR[2][2];
+
+			camera_matrix[0][0] = cameraPos.x;
+			camera_matrix[1][0] = cameraPos.y;
+			camera_matrix[2][0] = cameraPos.z;
+
+			camera_matrix[3][0] = 0;
+			camera_matrix[3][1] = 0;
+			camera_matrix[3][2] = 0;
+			camera_matrix[3][3] = 1;
 			
 			// Map to clipping space (Hopefully this is right)
 			vec4 tv0 = glm::vec4(v0.x, v0.y, v0.z, 1.0f);
 			vec4 tv1 = glm::vec4(v1.x, v1.y, v1.z, 1.0f);
 			vec4 tv2 = glm::vec4(v2.x, v2.y, v2.z, 1.0f);
+			
+			tv0 = tv0 * camera_matrix;
+			tv1 = tv1 * camera_matrix;
+			tv2 = tv2 * camera_matrix;
+
 			tv0 = tv0*transform;
 			tv1 = tv1*transform;
 			tv2 = tv2*transform;
@@ -625,7 +651,7 @@ void Draw()
 		vec3 currentNormal = triangles[i].normal;
 		vec3 currentReflactance = triangles[i].color;
 
-		//DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
+		DrawPolygon(vertices, triangles[i].color, currentNormal, currentReflactance);
 	}
 
     if ( SDL_MUSTLOCK(screen) )
