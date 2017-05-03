@@ -16,6 +16,7 @@ using glm::ivec2;
 
 #define POSTPROCESSING
 #define CHROMATICABERRATION
+#define GRAINEFFECT
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
@@ -116,12 +117,22 @@ void ApplyPostprocessing() {
 			} else c = image[x][y];
 			
 			#ifdef CHROMATICABERRATION
-				int r = 3;//rand()%5;
-
-				c = (c + image[x-r][y-r].x)/vec3(2.0f, 1.0f, 1.0f);
-				c = (c + image[x+r][y+r].y)/vec3(1.0f, 2.0f, 1.0f);
-				c = (c + image[x+r][y-r].z)/vec3(1.0f, 1.0f, 2.0f);
+				int r = 10;//rand()%5;
+				if(x-r>0 && y-r>0)
+					c = (c + image[x-r][y-r].x)/vec3(2.0f, 1.0f, 1.0f);
+				if(x+r<SCREEN_WIDTH && y+r < SCREEN_HEIGHT)
+					c = (c + image[x+r][y+r].y)/vec3(1.0f, 2.0f, 1.0f);
+				if(y-r>0 && x+r<SCREEN_WIDTH)
+					c = (c + image[x+r][y-r].z)/vec3(1.0f, 1.0f, 2.0f);
 			#endif
+
+			#ifdef GRAINEFFECT
+				int g = rand()%2;
+				if(g) {
+					vec3 grain((float(rand()%100)/100.f), float((rand()%100)/100.f), float((rand()%100)/100.f)); 
+					c = (c+grain)/2.0f;
+				}
+			#endif 
 			PutPixelSDL( screen, x, y, c);
 		}
 	}
