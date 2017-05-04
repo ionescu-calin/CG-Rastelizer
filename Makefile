@@ -7,6 +7,7 @@ B_DIR=Build
 
 S_DIR_B=Source/Source_Basic
 S_DIR_C=Source/Source_Clipping
+S_DIR_F=Source/Source_Final
 ########
 #   Output
 EXEC=$(B_DIR)/$(FILE)
@@ -56,6 +57,17 @@ shadows : $(S_DIR_F)/$(FILE).cpp $(S_DIR_F)/SDLauxiliary.h $(S_DIR_F)/TestModel.
 	$(CC) $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_F)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
 	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
 
+dof : $(S_DIR_F)/$(FILE).cpp $(S_DIR_F)/SDLauxiliary.h $(S_DIR_F)/TestModel.h
+	$(CC) -D POSTPROCESSING $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_F)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
+	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
+
+chromatic_aberration : $(S_DIR_F)/$(FILE).cpp $(S_DIR_F)/SDLauxiliary.h $(S_DIR_F)/TestModel.h
+	$(CC) -D POSTPROCESSING -D CHROMATICABERRATION -D CAMERAWARPEFFECT $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_F)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
+	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
+
+grain_effect : $(S_DIR_F)/$(FILE).cpp $(S_DIR_F)/SDLauxiliary.h $(S_DIR_F)/TestModel.h
+	$(CC) -D POSTPROCESSING -D GRAINEFFECT -D CAMERAWARPEFFECT $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_F)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
+	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
 
 clean:
 	rm -f $(B_DIR)/* 
