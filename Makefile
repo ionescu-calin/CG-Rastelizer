@@ -5,6 +5,8 @@ FILE=skeleton
 S_DIR=Source
 B_DIR=Build
 
+S_DIR_B=Source/Source_Basic
+S_DIR_C=Source/Source_Clipping
 ########
 #   Output
 EXEC=$(B_DIR)/$(FILE)
@@ -40,6 +42,18 @@ $(B_DIR)/$(FILE).o : $(S_DIR)/$(FILE).cpp $(S_DIR)/SDLauxiliary.h $(S_DIR)/TestM
 ########
 #   Main build rule     
 Build : $(OBJ) Makefile
+	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
+
+basic :  $(S_DIR_B)/$(FILE).cpp $(S_DIR_B)/SDLauxiliary.h $(S_DIR_B)/TestModel.h
+	$(CC) $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_B)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
+	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
+
+clipping : $(S_DIR_C)/$(FILE).cpp $(S_DIR_C)/SDLauxiliary.h $(S_DIR_C)/TestModel.h
+	$(CC) $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_C)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
+	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
+
+shadows : $(S_DIR_F)/$(FILE).cpp $(S_DIR_F)/SDLauxiliary.h $(S_DIR_F)/TestModel.h
+	$(CC) $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR_F)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
 	$(CC) $(LN_OPTS) -o $(EXEC) $(OBJ) $(SDL_LDFLAGS)
 
 
