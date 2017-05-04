@@ -592,52 +592,59 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 	int x = p.x;
 	int y = p.y;
 
-	if( x < SCREEN_HEIGHT && y < SCREEN_WIDTH )
+	if( p.zinv > depthBuffer[y][x] )
 	{
-		if( depthBuffering == 1 )
-		{
-			if( stencilBuffering == 1 )
-			{
-				if( p.zinv > depthBuffer[y][x] )
-				{
-					depthBuffer[y][x] = p.zinv;
-					vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
-					currentColor = currentColor * (R + frameBuffer[y][x]);
-					// PutPixelSDL( screen, x, y, currentColor );
-					#ifndef POSTPROCESSING
-						PutPixelSDL( screen, x, y, currentColor);
-					#else 
-						image[x][y] = currentColor;
-					#endif
-				}
-			}
-			else 
-			{
-				if( p.zinv > depthBuffer[y][x] )
-				{
-					depthBuffer[y][x] = p.zinv;
-					vec3 R = ComputeAmbientLight(currentReflactance);
-					frameBuffer[y][x] = R * currentColor;
-				}
-			}
-		}
-		else
-		{
-			if( p.zinv > depthBuffer[y][x] )
-			{
-				if(renderFrontFaces)
-				{
-					stencilBuffer[y][x]++;
-					frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
-				}
-				else 
-				{
-					stencilBuffer[y][x]--;
-					frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
-				}
-			}
-		}
+		depthBuffer[y][x] = p.zinv;
+		vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+		R = ComputePixelDirectionalLight(p, currentNormal, currentReflactance);
+		PutPixelSDL( screen, x, y, currentColor * R);
 	}
+	// if( x < SCREEN_HEIGHT && y < SCREEN_WIDTH )
+	// {
+	// 	if( depthBuffering == 1 )
+	// 	{
+	// 		if( stencilBuffering == 1 )
+	// 		{
+	// 			if( p.zinv > depthBuffer[y][x] )
+	// 			{
+	// 				depthBuffer[y][x] = p.zinv;
+	// 				vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
+	// 				currentColor = currentColor * (R + frameBuffer[y][x]);
+	// 				// PutPixelSDL( screen, x, y, currentColor );
+	// 				#ifndef POSTPROCESSING
+	// 					PutPixelSDL( screen, x, y, currentColor);
+	// 				#else 
+	// 					image[x][y] = currentColor;
+	// 				#endif
+	// 			}
+	// 		}
+	// 		else 
+	// 		{
+	// 			if( p.zinv > depthBuffer[y][x] )
+	// 			{
+	// 				depthBuffer[y][x] = p.zinv;
+	// 				vec3 R = ComputeAmbientLight(currentReflactance);
+	// 				frameBuffer[y][x] = R * currentColor;
+	// 			}
+	// 		}
+	// 	}
+	// 	else
+	// 	{
+	// 		if( p.zinv > depthBuffer[y][x] )
+	// 		{
+	// 			if(renderFrontFaces)
+	// 			{
+	// 				stencilBuffer[y][x]++;
+	// 				frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
+	// 			}
+	// 			else 
+	// 			{
+	// 				stencilBuffer[y][x]--;
+	// 				frameBuffer[y][x] = vec3(0.f, 0.f, 0.f);
+	// 			}
+	// 		}
+	// 	}
+	// }
 }
 
 void Interpolate( Pixel a, Pixel b, vector<Pixel>& result )
@@ -766,9 +773,8 @@ void RenderTriangles(vector<Triangle> triangles)
 	//#pragma omp parallel for
 	for( uint i=0; i<triangles.size(); ++i )
 	{
-		if(triangles[i].culled) {
+		if(triangles[i].culled)
 			continue;
-		}
 		vector<Vertex> vertices(3);
 
 		vertices[0].position = triangles[i].v0;
@@ -873,9 +879,9 @@ void Draw()
 		}
 	}
 
-	vector<Quad> quads;
-	vector<Triangle> caps;
-	ComputeSilhouettes(sceneObjects, quads, caps);
+	// vector<Quad> quads;
+	// vector<Triangle> caps;
+	// ComputeSilhouettes(sceneObjects, quads, caps);
 
 	//Clipping setup
 	float f = 251.0f;
@@ -978,42 +984,42 @@ void Draw()
 	}
 
 	// Disable writing to stencil buffer
-	stencilBuffering = 0;
+	//stencilBuffering = 0;
 	RenderTriangles(triangles);
 
-	// Disable writing to depth buffer
-	depthBuffering = 0;
+	// // Disable writing to depth buffer
+	// depthBuffering = 0;
 
-	// Draw front faces
-	renderFrontFaces = 1;
-	RenderQuads(quads);
-	RenderCaps(caps);
+	// // Draw front faces
+	// renderFrontFaces = 1;
+	// RenderQuads(quads);
+	// RenderCaps(caps);
 
-	// Draw back faces
-	renderFrontFaces = 0;
-	RenderQuads(quads);
-	RenderCaps(caps);
+	// // Draw back faces
+	// renderFrontFaces = 0;
+	// RenderQuads(quads);
+	// RenderCaps(caps);
 
-	// Enable stencil and buffer testing
-	stencilBuffering = 1;
-	depthBuffering = 1;
+	// // Enable stencil and buffer testing
+	// stencilBuffering = 1;
+	// depthBuffering = 1;
 	
 	// Clear depth buffer
-	#pragma omp parallel for
-	for( uint i=0; i<SCREEN_HEIGHT; ++i )
-	{
-		for( uint j=0; j<SCREEN_WIDTH; ++j )
-		{
-			depthBuffer[i][j] = 0.0f;
-		}
-	}
+	// #pragma omp parallel for
+	// for( uint i=0; i<SCREEN_HEIGHT; ++i )
+	// {
+	// 	for( uint j=0; j<SCREEN_WIDTH; ++j )
+	// 	{
+	// 		depthBuffer[i][j] = 0.0f;
+	// 	}
+	// }
 
 	// Render scene preforming depth and stencil test
 	RenderTriangles(triangles);
 
-	#ifdef POSTPROCESSING
-		ApplyPostprocessing();
-	#endif	
+	// #ifdef POSTPROCESSING
+	// 	ApplyPostprocessing();
+	// #endif	
 
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
