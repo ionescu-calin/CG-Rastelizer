@@ -16,11 +16,10 @@ using glm::mat4;
 #define MoveSpeed 0.01f
 #define LightMoveSpeed 0.01f
 
-#define POSTPROCESSING
+// #define POSTPROCESSING
 // #define CHROMATICABERRATION
 // #define GRAINEFFECT
 // #define CAMERAWARPEFFECT
-
 int cameraSpeed = 0;
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS */
@@ -108,7 +107,7 @@ vec3 pink( 1.000, 0.078, 0.576 );
 
 /*LIGHT VALUES - POINT LIGHT*/
 vec3 lightPos(0.21, 0.14, 0.17);//(0.01, -0.19, -0.29);//(0.f,-0.5f,-0.7f);//(0.3f, 0.1f, -0.2f);
-vec3 lightPower = 5.1f*vec3( 1.0f, 1.0f, 1.0f );
+vec3 lightPower = 1.1f*vec3( 1.0f, 1.0f, 1.0f );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 
 /*DIRECTIONAL LIGHT*/
@@ -210,7 +209,7 @@ void ApplyPostprocessing() {
 			} else c = image[x][y];
 			
 			#ifdef CHROMATICABERRATION
-				int r = 10;//rand()%5;
+				int r = 3;//rand()%5;
 				if(x-r>0 && y-r>0)
 					c = (c + image[x-r][y-r].x)/vec3(2.0f, 1.0f, 1.0f);
 				if(x+r<SCREEN_WIDTH && y+r < SCREEN_HEIGHT)
@@ -978,7 +977,7 @@ void Draw()
 	}
 
 	// Disable writing to stencil buffer
-	//stencilBuffering = 0;
+	stencilBuffering = 0;
 	RenderTriangles(triangles);
 
 	// Disable writing to depth buffer
