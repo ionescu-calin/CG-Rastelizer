@@ -604,11 +604,11 @@ void PixelShader( Pixel& p, vec3 currentColor, vec3 currentNormal, vec3 currentR
 					vec3 R = ComputePixelReflectedLight(p, currentNormal, currentReflactance);
 					currentColor = currentColor * (R + frameBuffer[y][x]);
 					// PutPixelSDL( screen, x, y, currentColor );
-					#ifndef POSTPROCESSING
+					//#ifndef POSTPROCESSING
 						PutPixelSDL( screen, x, y, currentColor);
-					#else 
-						image[x][y] = currentColor;
-					#endif
+					//#else 
+					//	image[x][y] = currentColor;
+					//#endif
 				}
 			}
 			else 
@@ -977,7 +977,7 @@ void Draw()
 	}
 
 	// Disable writing to stencil buffer
-	//stencilBuffering = 0;
+	stencilBuffering = 0;
 	RenderTriangles(triangles);
 
 	// Disable writing to depth buffer
@@ -1010,9 +1010,9 @@ void Draw()
 	// Render scene preforming depth and stencil test
 	RenderTriangles(triangles);
 
-	#ifdef POSTPROCESSING
-		ApplyPostprocessing();
-	#endif	
+	// #ifdef POSTPROCESSING
+	// 	ApplyPostprocessing();
+	// #endif	
 
     if ( SDL_MUSTLOCK(screen) )
 		SDL_UnlockSurface(screen);
