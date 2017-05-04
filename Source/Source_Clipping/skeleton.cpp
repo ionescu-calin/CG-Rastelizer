@@ -202,7 +202,7 @@ void CohenSutherlandLineClipAndDraw(float x0, float y0, float x1, float y1, vec4
 
 }
 
-bool InCuboid(glm::vec4 v)
+bool insideCube(glm::vec4 v)
 {
 	if(-1.f <= v.x/v.w && v.x/v.w <= 1.f && -1.f <= v.y/v.w && v.y/v.w <= 1.f && -1.f <= v.z/v.w && v.z/v.w <= 1.f) 
 		return true;
@@ -270,11 +270,11 @@ void SetCullingAndClipping() {
 			tv1 = tv1*transform;
 			tv2 = tv2*transform;
 			
-			bool bv0 = InCuboid(tv0);
-			bool bv1 = InCuboid(tv1);
-			bool bv2 = InCuboid(tv2);
+			bool culled_v0 = insideCube(tv0);
+			bool culled_v1 = insideCube(tv1);
+			bool culled_v2 = insideCube(tv2);
 
-			if (!bv0 || !bv1 || !bv2) {
+			if (!culled_v0 || !culled_v1 || !culled_v2) {
 				triangles[i].culled = true;
 			}
 
